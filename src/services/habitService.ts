@@ -1,5 +1,6 @@
 import { habitRepository } from '../database/repositories/habitRepository';
-import { Habit, HabitCompletion, CreateHabitInput, UpdateHabitInput, HabitFilter } from '../types/habit.types';
+import { CreateHabitInput, Habit, HabitCompletion, HabitFilter, UpdateHabitInput } from '../types/habit.types';
+import { gamificationService } from './gamificationService';
 
 class HabitService {
     async createHabit(input: CreateHabitInput): Promise<Habit> {
@@ -24,7 +25,14 @@ class HabitService {
     }
 
     async logCompletion(habitId: number, date: string, notes?: string): Promise<HabitCompletion> {
-        return habitRepository.logCompletion(habitId, date, notes);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            throw new Error('Invalid date format. Expected YYYY-MM-DD');
+        }
+        const habit = await habitRepository.findById(habitId);
+        if (!habit) throw new Error('Habit not found');
+        const completion = await habitRepository.logCompletion(habitId, date, notes);
+        await gamificationService.awardXP('complete_habit');
+        return completion;
     }
 
     async undoCompletion(habitId: number, date: string): Promise<void> {

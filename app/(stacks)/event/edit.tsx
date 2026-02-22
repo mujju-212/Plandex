@@ -25,7 +25,7 @@ const EVENT_COLORS = ['#1A73E8', '#E91E63', '#4CAF50', '#FF9800', '#9C27B0', '#0
 export default function EditEventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const tc = useThemeStore().colors;
+  const { isDark, colors: tc } = useThemeStore();
   const { events, updateEvent } = useEventStore();
 
   const [title, setTitle] = useState('');
@@ -259,19 +259,19 @@ export default function EditEventScreen() {
       </ScrollView>
 
       {Platform.OS !== 'web' && showStartDatePicker && (
-        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'startDate')} />
+        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} themeVariant={isDark ? 'dark' : 'light'} onChange={(event, date) => handleDateChange(event, date, 'startDate')} />
       )}
       {Platform.OS !== 'web' && showStartTimePicker && (
-        <DateTimePicker value={tempDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'startTime')} />
+        <DateTimePicker value={tempDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} themeVariant={isDark ? 'dark' : 'light'} onChange={(event, date) => handleDateChange(event, date, 'startTime')} />
       )}
       {Platform.OS !== 'web' && showEndDatePicker && (
-        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'endDate')} />
+        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} themeVariant={isDark ? 'dark' : 'light'} onChange={(event, date) => handleDateChange(event, date, 'endDate')} />
       )}
       {Platform.OS !== 'web' && showEndTimePicker && (
-        <DateTimePicker value={tempDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'endTime')} />
+        <DateTimePicker value={tempDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} themeVariant={isDark ? 'dark' : 'light'} onChange={(event, date) => handleDateChange(event, date, 'endTime')} />
       )}
       {Platform.OS !== 'web' && showRecurringEndPicker && (
-        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'recurringEnd')} />
+        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} themeVariant={isDark ? 'dark' : 'light'} onChange={(event, date) => handleDateChange(event, date, 'recurringEnd')} />
       )}
 
       <View style={styles.bottomContainer}>

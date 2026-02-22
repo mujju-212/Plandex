@@ -38,10 +38,18 @@ class MoodRepository {
     }
     const db = getDB();
     const r = await db.runAsync(
-      'INSERT OR REPLACE INTO mood_entries (date, mood, mood_score, energy_level, notes, tags, activities) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      `INSERT INTO mood_entries (date, mood, mood_score, energy_level, notes, tags, activities)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(date) DO UPDATE SET
+         mood = excluded.mood, mood_score = excluded.mood_score,
+         energy_level = excluded.energy_level, notes = excluded.notes,
+         tags = excluded.tags, activities = excluded.activities,
+         updated_at = CURRENT_TIMESTAMP`,
       [input.date, input.mood, input.mood_score, input.energy_level || 3, input.notes || null, JSON.stringify(input.tags || []), JSON.stringify(input.activities || [])]
     );
-    return (await this.findById(r.lastInsertRowId))!;
+    // After ON CONFLICT, lastInsertRowId may be 0; look up by date instead
+    const entry = await this.findByDate(input.date);
+    return entry!;
   }
 
   async findAll(limit = 30): Promise<MoodEntry[]> {
@@ -108,14 +116,14 @@ class MoodRepository {
   }
 
   async getStreak(): Promise<number> {
-    const moods = await this.findAll(60);
+    const moods = await this.findAll(365);
     if (moods.length === 0) return 0;
     let streak = 0;
     const today = new Date();
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 365; i++) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       if (moods.find(m => m.date === dateStr)) streak++;
       else break;
     }

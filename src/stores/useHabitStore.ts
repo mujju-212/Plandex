@@ -66,19 +66,23 @@ export const useHabitStore = create<HabitState>((set, get) => ({
 
     toggleCompletion: async (habitId, date) => {
         try {
-            const { todayCompletions } = get();
-            const existing = todayCompletions.find(c => c.habit_id === habitId && c.date === date);
+            // Re-read state right before decision to avoid race condition with concurrent toggles
+            const existing = get().todayCompletions.find(c => c.habit_id === habitId && c.date === date);
             if (existing) {
                 await habitService.undoCompletion(habitId, date);
+                // Re-read after async to ensure freshest state
                 set(s => ({ todayCompletions: s.todayCompletions.filter(c => !(c.habit_id === habitId && c.date === date)) }));
-                const habits = await habitService.getHabits();
-                set({ habits });
             } else {
                 const comp = await habitService.logCompletion(habitId, date);
-                set(s => ({ todayCompletions: [...s.todayCompletions, comp] }));
-                const habits = await habitService.getHabits();
-                set({ habits });
+                // Guard: double-check it wasn't already added by a concurrent toggle
+                set(s => {
+                    const alreadyExists = s.todayCompletions.some(c => c.habit_id === habitId && c.date === date);
+                    return alreadyExists ? {} : { todayCompletions: [...s.todayCompletions, comp] };
+                });
             }
+            // Always reload habits from DB for accurate streak/completion counts
+            const habits = await habitService.getHabits();
+            set({ habits });
         } catch (e: any) { set({ error: e.message }); }
     },
 }));

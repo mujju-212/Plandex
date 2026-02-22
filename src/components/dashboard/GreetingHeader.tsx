@@ -42,7 +42,7 @@ export default function GreetingHeader({
     <View style={styles.container}>
       <View style={styles.textContainer}>
         <View style={styles.topRow}>
-          <Text style={[styles.appName, { color: tc.primary }]}>MyPlanner</Text>
+          <Text style={[styles.appName, { color: tc.primary }]}>Plandex</Text>
           <View style={[styles.levelBadge, { backgroundColor: tc.primary + '18' }]}>
             <MaterialIcons name="star" size={14} color={tc.primary} />
             <Text style={[styles.levelText, { color: tc.primary }]}>Lv.{level}</Text>

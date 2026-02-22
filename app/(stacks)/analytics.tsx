@@ -7,7 +7,6 @@ import { useHabitStore } from '../../src/stores/useHabitStore';
 import { useLogStore } from '../../src/stores/useLogStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { useTodoStore } from '../../src/stores/useTodoStore';
-import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/typography';
 
 export default function AnalyticsScreen() {
@@ -143,20 +142,20 @@ export default function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 50, paddingBottom: 8 },
-  headerBtn: { padding: 8, borderRadius: 20, backgroundColor: colors.cardBackground },
-  headerTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary },
+  headerBtn: { padding: 8, borderRadius: 20 },
+  headerTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any },
   content: { padding: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statCard: { width: '47%', backgroundColor: colors.cardBackground, borderRadius: 16, padding: 18, alignItems: 'center', gap: 6 },
-  statValue: { fontSize: typography.sizes.xxl, fontWeight: typography.weights.bold as any, color: colors.textPrimary },
-  statLabel: { fontSize: typography.sizes.xs, color: colors.textSecondary },
-  sectionTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any, color: colors.textPrimary, marginTop: 24, marginBottom: 12 },
-  breakdownCard: { backgroundColor: colors.cardBackground, borderRadius: 16, padding: 16 },
+  statCard: { width: '47%', borderRadius: 16, padding: 18, alignItems: 'center', gap: 6 },
+  statValue: { fontSize: typography.sizes.xxl, fontWeight: typography.weights.bold as any },
+  statLabel: { fontSize: typography.sizes.xs },
+  sectionTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any, marginTop: 24, marginBottom: 12 },
+  breakdownCard: { borderRadius: 16, padding: 16 },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10 },
-  breakdownLabel: { width: 70, fontSize: typography.sizes.sm, color: colors.textSecondary },
-  breakdownBar: { flex: 1, height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: 'hidden' as const },
+  breakdownLabel: { width: 70, fontSize: typography.sizes.sm },
+  breakdownBar: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden' as const },
   breakdownFill: { height: '100%' as any, borderRadius: 4 },
-  breakdownValue: { width: 24, textAlign: 'right' as const, fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary },
+  breakdownValue: { width: 24, textAlign: 'right' as const, fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any },
 });

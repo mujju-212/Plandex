@@ -21,7 +21,6 @@ import { useHabitStore } from '../../src/stores/useHabitStore';
 import { useLogStore } from '../../src/stores/useLogStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { useTodoStore } from '../../src/stores/useTodoStore';
-import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/typography';
 
 export default function HomeTab() {
@@ -348,11 +347,11 @@ export default function HomeTab() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 20, marginTop: 20, marginBottom: 8 },
   sectionLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sectionTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any, color: colors.textPrimary },
+  sectionTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any },
   todoBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
   todoBadgeText: { fontSize: 11, fontWeight: typography.weights.bold as any },
   viewAllLink: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any },

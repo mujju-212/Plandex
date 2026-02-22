@@ -61,7 +61,9 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
         set({ isDark: newIsDark, colors: newIsDark ? darkColors : lightColors });
         try {
             await AsyncStorage.setItem(THEME_KEY, JSON.stringify(newIsDark));
-        } catch { }
+        } catch (e) {
+            console.warn('Failed to persist theme preference:', e);
+        }
     },
 
     loadTheme: async () => {
@@ -71,6 +73,8 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
                 const isDark = JSON.parse(raw);
                 set({ isDark, colors: isDark ? darkColors : lightColors });
             }
-        } catch { }
+        } catch (e) {
+            console.warn('Failed to load theme preference:', e);
+        }
     },
 }));

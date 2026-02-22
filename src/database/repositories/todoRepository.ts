@@ -1,7 +1,7 @@
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import { CreateTodoInput, Todo, TodoFilter, UpdateTodoInput } from '../../types/todo.types';
 import { getDB } from '../database';
-import { Todo, CreateTodoInput, UpdateTodoInput, TodoFilter } from '../../types/todo.types';
 
 const TODOS_STORAGE_KEY = 'myplanner_todos';
 
@@ -130,12 +130,14 @@ class TodoRepository {
             if (filter.exclude_archived) {
                 query += ' AND status != "archived"';
             }
-            if (filter.limit) {
-                query += ` LIMIT ${filter.limit}`;
-            }
         }
 
         query += ' ORDER BY position ASC, created_at DESC';
+
+        if (filter?.limit) {
+            query += ' LIMIT ?';
+            params.push(filter.limit);
+        }
 
         const rows = await db.getAllAsync(query, params);
         return rows.map((row: any) => this.mapRowToTodo(row));
@@ -158,12 +160,21 @@ class TodoRepository {
         const current = await this.findById(id);
         if (!current) throw new Error('Todo not found');
 
+        const ALLOWED_COLUMNS = new Set([
+            'title', 'description', 'list_id', 'priority', 'status',
+            'date_type', 'start_date', 'end_date', 'due_time',
+            'is_recurring', 'tags', 'position',
+        ]);
+
         const mappedInput: any = { ...input };
         if (input.tags) {
             mappedInput.tags = JSON.stringify(input.tags);
         }
+        if (mappedInput.is_recurring !== undefined) {
+            mappedInput.is_recurring = mappedInput.is_recurring ? 1 : 0;
+        }
 
-        const keys = Object.keys(mappedInput);
+        const keys = Object.keys(mappedInput).filter(k => ALLOWED_COLUMNS.has(k));
         if (keys.length === 0) return current;
 
         const setClause = keys.map(k => `${k} = ?`).join(', ');
@@ -190,6 +201,9 @@ class TodoRepository {
         }
 
         const db = getDB();
+        const existing = await this.findById(id);
+        if (!existing) throw new Error('Todo not found');
+
         await db.runAsync(
             `UPDATE todos SET status = 'completed', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
             [id]
@@ -209,10 +223,16 @@ class TodoRepository {
     }
 
     private mapRowToTodo(row: any): Todo {
+        let tags: string[] = [];
+        try {
+            tags = JSON.parse(row.tags || '[]');
+        } catch {
+            tags = [];
+        }
         return {
             ...row,
             is_recurring: Boolean(row.is_recurring),
-            tags: JSON.parse(row.tags || '[]'),
+            tags,
         };
     }
 }

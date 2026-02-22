@@ -62,8 +62,14 @@ class ClockRepository {
     if (input.sound_uri !== undefined) { sets.push('sound_uri = ?'); params.push(input.sound_uri); }
     if (input.sound_name !== undefined) { sets.push('sound_name = ?'); params.push(input.sound_name); }
     if (input.vibrate !== undefined) { sets.push('vibrate = ?'); params.push(input.vibrate ? 1 : 0); }
+    if (sets.length === 0) {
+      const row = await db.getFirstAsync('SELECT * FROM alarms WHERE id = ?', [id]);
+      if (!row) throw new Error('Alarm not found');
+      return mapAlarm(row);
+    }
     await db.runAsync(`UPDATE alarms SET ${sets.join(', ')} WHERE id = ?`, [...params, id]);
     const row = await db.getFirstAsync('SELECT * FROM alarms WHERE id = ?', [id]);
+    if (!row) throw new Error('Alarm not found');
     return mapAlarm(row);
   }
 
@@ -109,7 +115,8 @@ class ClockRepository {
   }
 
   async getTodayFocusMinutes(): Promise<number> {
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     if (Platform.OS === 'web') {
       const all = await getWeb<FocusSession>(SESSION_KEY);
       return all.filter(s => s.started_at.startsWith(today) && s.status === 'completed').reduce((sum, s) => sum + Math.round(s.actual_seconds / 60), 0);

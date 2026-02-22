@@ -110,11 +110,14 @@ class PlanningRepository {
     if (Platform.OS === 'web') {
       const notes = await getWeb<PlanningNote>(NOTES_KEY);
       const idx = notes.findIndex(n => n.id === id);
-      if (idx >= 0) { notes[idx] = { ...notes[idx], title, content, updated_at: new Date().toISOString() }; await saveWeb(NOTES_KEY, notes); }
+      if (idx === -1) throw new Error('Planning note not found');
+      notes[idx] = { ...notes[idx], title, content, updated_at: new Date().toISOString() };
+      await saveWeb(NOTES_KEY, notes);
       return;
     }
     const db = getDB();
-    await db.runAsync('UPDATE planning_notes SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [title, content, id]);
+    const result = await db.runAsync('UPDATE planning_notes SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [title, content, id]);
+    if (result.changes === 0) throw new Error('Planning note not found');
   }
 
   async deleteNote(id: number): Promise<void> {

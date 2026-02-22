@@ -123,7 +123,7 @@ class EventRepository {
             query += ' AND (title LIKE ? OR description LIKE ?)';
             params.push(`%${filter.search}%`, `%${filter.search}%`);
         }
-        query += ' ORDER BY start_datetime ASC';
+        query += ' ORDER BY start_datetime ASC LIMIT 500';
 
         const rows = await db.getAllAsync(query, params);
         return rows.map((r: any) => mapRowToEvent(r));
@@ -194,8 +194,16 @@ class EventRepository {
         const keys = Object.keys(mappedInput);
         if (keys.length === 0) return current;
 
-        const setClause = keys.map(k => `${k} = ?`).join(', ');
-        const values = keys.map(k => mappedInput[k]);
+        const ALLOWED_COLUMNS = new Set([
+            'title', 'description', 'event_type', 'start_datetime', 'end_datetime',
+            'is_all_day', 'location', 'color', 'category', 'is_recurring',
+            'recurring_pattern', 'status',
+        ]);
+        const safeKeys = keys.filter(k => ALLOWED_COLUMNS.has(k));
+        if (safeKeys.length === 0) return current;
+
+        const setClause = safeKeys.map(k => `${k} = ?`).join(', ');
+        const values = safeKeys.map(k => mappedInput[k]);
 
         await db.runAsync(
             `UPDATE events SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,

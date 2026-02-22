@@ -44,8 +44,12 @@ export default function FocusScreen() {
   const [showTodos, setShowTodos] = useState(false);
   const [tab, setTab] = useState<'timer' | 'history'>('timer');
   const intervalRef = useRef<any>(null);
+  const sessionIdRef = useRef<number | null>(null);
 
   useEffect(() => { loadSessions(); loadTodayFocus(); loadTodos(); }, []);
+
+  // Keep ref in sync with state for closure-safe access
+  useEffect(() => { sessionIdRef.current = currentSessionId; }, [currentSessionId]);
 
   const selectPreset = (p: typeof PRESETS[0]) => {
     if (running) return;
@@ -77,9 +81,10 @@ export default function FocusScreen() {
   const resetFocus = async () => {
     setRunning(false);
     clearInterval(intervalRef.current);
-    if (currentSessionId) {
+    const sid = sessionIdRef.current;
+    if (sid) {
       const elapsed = totalSeconds - remaining;
-      await endSession(currentSessionId, elapsed, 'cancelled');
+      await endSession(sid, elapsed, 'cancelled');
       setCurrentSessionId(null);
     }
     setRemaining(preset.work * 60);
@@ -106,9 +111,10 @@ export default function FocusScreen() {
   const handlePhaseComplete = async () => {
     setRunning(false);
     if (isWorking) {
-      // Work phase done
-      if (currentSessionId) {
-        await endSession(currentSessionId, preset.work * 60, 'completed');
+      // Work phase done — use ref to get fresh session ID
+      const sid = sessionIdRef.current;
+      if (sid) {
+        await endSession(sid, preset.work * 60, 'completed');
         setCurrentSessionId(null);
         loadTodayFocus();
       }

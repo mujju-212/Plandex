@@ -1,13 +1,12 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Pressable } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../src/theme/colors';
-import { typography } from '../../src/theme/typography';
-import { useGamificationStore } from '../../src/stores/useGamificationStore';
+import { Stack, useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LEVELS } from '../../src/services/gamificationService';
+import { useGamificationStore } from '../../src/stores/useGamificationStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
+import { typography } from '../../src/theme/typography';
 
 export default function AchievementsScreen() {
     const router = useRouter();
@@ -114,10 +113,10 @@ export default function AchievementsScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 50, paddingBottom: 8 },
-    headerBtn: { padding: 8, borderRadius: 20, backgroundColor: colors.cardBackground },
-    headerTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary },
+    headerBtn: { padding: 8, borderRadius: 20 },
+    headerTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any },
     scroll: { paddingHorizontal: 20, paddingBottom: 40 },
     levelCard: { borderRadius: 20, padding: 20, marginBottom: 16 },
     levelTop: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
@@ -129,21 +128,20 @@ const styles = StyleSheet.create({
     xpBarFill: { height: '100%', backgroundColor: '#FFF', borderRadius: 4 },
     xpProgress: { fontSize: typography.sizes.xs, color: 'rgba(255,255,255,0.7)', marginTop: 6, textAlign: 'center' },
     statsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
-    statCard: { flex: 1, alignItems: 'center', backgroundColor: colors.cardBackground, borderRadius: 16, paddingVertical: 16, gap: 4 },
-    statValue: { fontSize: 22, fontWeight: typography.weights.bold as any, color: colors.textPrimary },
-    statLabel: { fontSize: typography.sizes.xs, color: colors.textSecondary },
-    sectionTitle: { fontSize: typography.sizes.md, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary, marginBottom: 12, marginTop: 4 },
+    statCard: { flex: 1, alignItems: 'center', borderRadius: 16, paddingVertical: 16, gap: 4 },
+    statValue: { fontSize: 22, fontWeight: typography.weights.bold as any },
+    statLabel: { fontSize: typography.sizes.xs },
+    sectionTitle: { fontSize: typography.sizes.md, fontWeight: typography.weights.semiBold as any, marginBottom: 12, marginTop: 4 },
     badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-    badgeCard: { width: '48%' as any, backgroundColor: colors.cardBackground, borderRadius: 16, padding: 16, alignItems: 'center', gap: 6 },
+    badgeCard: { width: '48%' as any, borderRadius: 16, padding: 16, alignItems: 'center', gap: 6 },
     badgeLocked: { opacity: 0.5 },
     badgeIcon: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-    badgeTitle: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary, textAlign: 'center' },
-    badgeTitleLocked: { color: colors.textSecondary },
-    badgeDesc: { fontSize: typography.sizes.xs, color: colors.textSecondary, textAlign: 'center' },
-    badgeReq: { fontSize: typography.sizes.xs, fontWeight: typography.weights.medium as any, color: colors.textSecondary, marginTop: 4 },
-    xpList: { backgroundColor: colors.cardBackground, borderRadius: 16, overflow: 'hidden' },
-    xpRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    badgeTitle: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any, textAlign: 'center' },
+    badgeDesc: { fontSize: typography.sizes.xs, textAlign: 'center' },
+    badgeReq: { fontSize: typography.sizes.xs, fontWeight: typography.weights.medium as any, marginTop: 4 },
+    xpList: { borderRadius: 16, overflow: 'hidden' },
+    xpRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12, borderBottomWidth: 1 },
     xpRowIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    xpRowLabel: { flex: 1, fontSize: typography.sizes.sm, color: colors.textPrimary },
+    xpRowLabel: { flex: 1, fontSize: typography.sizes.sm },
     xpRowValue: { fontSize: typography.sizes.sm, fontWeight: typography.weights.bold as any },
 });

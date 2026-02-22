@@ -44,7 +44,7 @@ class NoteRepository {
   async findAll(): Promise<StickyNote[]> {
     if (Platform.OS === 'web') return getWebNotes();
     const db = getDB();
-    const rows = await db.getAllAsync('SELECT * FROM sticky_notes ORDER BY is_pinned DESC, updated_at DESC');
+    const rows = await db.getAllAsync('SELECT * FROM sticky_notes ORDER BY is_pinned DESC, updated_at DESC LIMIT 200');
     return rows.map(mapRow);
   }
 

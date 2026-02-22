@@ -139,6 +139,8 @@ export async function scheduleHabitReminder(
     if (!granted) return null;
 
     const [hours, minutes] = reminderTime.split(':').map(Number);
+    if (isNaN(hours) || isNaN(minutes)) return null;
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
 
     const id = await Notifications.scheduleNotificationAsync({
       content: {
@@ -178,14 +180,16 @@ export async function scheduleEventReminder(
     const granted = await hasNotificationPermission();
     if (!granted) return null;
 
+    const safeMinutesBefore = Math.max(0, minutesBefore);
+
     const eventTime = new Date(startDatetime);
-    const notifyTime = new Date(eventTime.getTime() - minutesBefore * 60 * 1000);
+    const notifyTime = new Date(eventTime.getTime() - safeMinutesBefore * 60 * 1000);
     if (notifyTime.getTime() <= Date.now()) return null;
 
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title: '📅 Event Coming Up',
-        body: `${title} starts ${minutesBefore > 0 ? `in ${minutesBefore} min` : 'now'}`,
+        body: `${title} starts ${safeMinutesBefore > 0 ? `in ${safeMinutesBefore} min` : 'now'}`,
         data: { type: 'event', eventId },
         sound: true,
       },
@@ -235,6 +239,7 @@ export async function scheduleGoalDeadlineReminder(
 // ─── Cancel ─────────────────────────────────────────────────
 
 export async function cancelNotification(notificationId: string): Promise<void> {
+  if (!notificationId || notificationId.trim() === '') return;
   const Notifications = getNotificationsModule();
   if (!Notifications) return;
   try { await Notifications.cancelScheduledNotificationAsync(notificationId); } catch {}
@@ -260,12 +265,24 @@ function buildDateTrigger(
   daysBefore: number = 0,
 ): Date | null {
   try {
-    const date = new Date(dateStr);
+    // Parse YYYY-MM-DD as local date (not UTC) to avoid timezone shift
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return null;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // Date months are 0-indexed
+    const day = parseInt(parts[2], 10);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
+
+    const date = new Date(year, month, day);
     if (isNaN(date.getTime())) return null;
 
     if (timeStr) {
       const [h, m] = timeStr.split(':').map(Number);
-      date.setHours(h, m, 0, 0);
+      if (!isNaN(h) && !isNaN(m)) {
+        date.setHours(h, m, 0, 0);
+      } else {
+        date.setHours(9, 0, 0, 0);
+      }
     } else {
       date.setHours(9, 0, 0, 0);
     }
@@ -395,7 +412,7 @@ export async function scheduleMorningScheduleWithEvents(
     if (eventCount === 0) {
       body = 'No events scheduled for today. Enjoy a relaxed day!';
     } else if (eventCount === 1) {
-      body = `You have 1 event today: ${eventTitles[0]}`;
+      body = `You have 1 event today: ${eventTitles[0] ?? 'Untitled'}`;
     } else {
       const listed = eventTitles.slice(0, 3).join(', ');
       const more = eventCount > 3 ? ` and ${eventCount - 3} more` : '';

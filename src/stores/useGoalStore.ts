@@ -61,14 +61,14 @@ export const useGoalStore = create<GoalState>((set) => ({
     achieveGoal: async (id, notes?) => {
         try {
             const goal = await goalService.achieveGoal(id, notes);
-            set(s => ({ goals: s.goals.map(g => g.id === id ? goal : g) }));
+            set(s => ({ goals: s.goals.map(g => g.id === id ? goal : g), selectedGoal: s.selectedGoal?.id === id ? goal : s.selectedGoal }));
         } catch (e: any) { set({ error: e.message }); }
     },
 
     updateProgress: async (id, value) => {
         try {
             const goal = await goalService.updateProgress(id, value);
-            set(s => ({ goals: s.goals.map(g => g.id === id ? goal : g) }));
+            set(s => ({ goals: s.goals.map(g => g.id === id ? goal : g), selectedGoal: s.selectedGoal?.id === id ? goal : s.selectedGoal }));
         } catch (e: any) { set({ error: e.message }); }
     },
 

@@ -34,8 +34,10 @@ interface GamificationState {
     todosCompleted: number;
     badges: Badge[];
     isLoading: boolean;
+    error: string | null;
     loadStats: () => Promise<void>;
     awardXP: (action: keyof typeof XP_AWARDS) => Promise<void>;
+    clearError: () => void;
 }
 
 export const useGamificationStore = create<GamificationState>((set, get) => ({
@@ -46,6 +48,7 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
     todosCompleted: 0,
     badges: DEFAULT_BADGES,
     isLoading: false,
+    error: null,
 
     loadStats: async () => {
         try {
@@ -92,16 +95,24 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
                             badges,
                         });
                     }
-                } catch (err) {
+                } catch (err: any) {
                     console.error('Failed to load native stats', err);
+                    set({ error: err.message || 'Failed to load stats' });
                 }
                 set({ isLoading: false });
             }
-        } catch { set({ isLoading: false }); }
+        } catch (e: any) { set({ isLoading: false, error: e.message }); }
     },
 
     awardXP: async (action) => {
-        await gamificationService.awardXP(action);
-        await get().loadStats();
+        try {
+            set({ error: null });
+            await gamificationService.awardXP(action);
+            await get().loadStats();
+        } catch (e: any) {
+            set({ error: e.message });
+        }
     },
+
+    clearError: () => set({ error: null }),
 }));

@@ -1,17 +1,28 @@
 {
   "expo": {
-    "name": "myplanner",
-    "slug": "myplanner",
+    "name": "Plandex",
+    "slug": "plandex",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myplanner",
+    "scheme": "plandex",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/9f836fb9-8e6e-4ed9-978f-5bbcb5082249",
+      "enabled": true,
+      "fallbackToCacheTimeout": 5000,
+      "checkAutomatically": "ON_LOAD"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mujju212.plandex"
     },
     "android": {
+      "package": "com.mujju212.plandex",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -47,11 +58,19 @@
           "icon": "./assets/images/icon.png",
           "color": "#1A73E8"
         }
-      ]
+      ],
+      "expo-updates"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9f836fb9-8e6e-4ed9-978f-5bbcb5082249"
+      }
+    },
+    "owner": "mujju-212"
   }
 }

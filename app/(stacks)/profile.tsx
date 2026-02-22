@@ -5,16 +5,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { LEVELS } from '../../src/services/gamificationService';
 import { useGamificationStore } from '../../src/stores/useGamificationStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
-import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/typography';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const tc = useThemeStore().colors;
-  const [name, setName] = useState('Mujju');
+  const [name, setName] = useState('');
   const [profession, setProfession] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
@@ -28,10 +28,11 @@ export default function ProfileScreen() {
     loadStats,
   } = useGamificationStore();
 
-  // XP progress calculation using LEVELS thresholds
-  const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5500, 7500];
-  const curMin = LEVEL_THRESHOLDS[currentLevel - 1] ?? 0;
-  const nextMin = LEVEL_THRESHOLDS[currentLevel] ?? null;
+  // XP progress calculation using LEVELS from gamificationService
+  const currentLevelData = LEVELS.find(l => l.level === currentLevel) || LEVELS[0];
+  const nextLevelData = LEVELS.find(l => l.level === currentLevel + 1) || null;
+  const curMin = currentLevelData.min_xp;
+  const nextMin = nextLevelData ? nextLevelData.min_xp : null;
   const xpIntoLevel = totalXP - curMin;
   const xpForNext = nextMin !== null ? nextMin - curMin : 1;
   const progressToNextLevel = nextMin !== null ? Math.min(100, Math.round((xpIntoLevel / xpForNext) * 100)) : 100;
@@ -46,7 +47,8 @@ export default function ProfileScreen() {
   const pickImage = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permission required', 'Please allow access to your photo library.');
+      const msg = 'Please allow access to your photo library.';
+      Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Permission required', msg);
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -65,7 +67,8 @@ export default function ProfileScreen() {
   const saveProfile = async () => {
     await AsyncStorage.setItem('profile_name', name.trim() || 'User');
     await AsyncStorage.setItem('profile_profession', profession);
-    Alert.alert('Saved', 'Profile updated!');
+    const msg = 'Profile updated!';
+    Platform.OS === 'web' ? window.alert(msg) : Alert.alert('Saved', msg);
     router.back();
   };
 
@@ -128,7 +131,7 @@ export default function ProfileScreen() {
           </View>
 
           {/* Stats Row */}
-          <View style={styles.statsRow}>
+          <View style={[styles.statsRow, { borderColor: tc.border + '50' }]}>
             <View style={styles.statItem}>
               <MaterialIcons name="check-circle" size={24} color={tc.success} />
               <Text style={[styles.statValue, { color: tc.textPrimary }]}>{todosCompleted}</Text>
@@ -217,54 +220,54 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 50, paddingBottom: 8 },
-  headerBtn: { padding: 8, borderRadius: 20, backgroundColor: colors.cardBackground },
-  headerTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary },
+  headerBtn: { padding: 8, borderRadius: 20 },
+  headerTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any },
   content: { padding: 20 },
   avatarSection: { position: 'relative' as const, marginBottom: 24, alignSelf: 'center' as const },
   avatar: { width: 100, height: 100, borderRadius: 50, alignItems: 'center' as const, justifyContent: 'center' as const, overflow: 'hidden' as const },
   avatarText: { fontSize: 40, fontWeight: '700' as const, color: '#FFF' },
   avatarPhoto: { width: 100, height: 100, borderRadius: 50 },
-  editAvatarBtn: { position: 'absolute' as const, bottom: 0, right: 0, backgroundColor: colors.primary, width: 32, height: 32, borderRadius: 16, alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 3, borderColor: colors.background },
+  editAvatarBtn: { position: 'absolute' as const, bottom: 0, right: 0, width: 32, height: 32, borderRadius: 16, alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 3 },
   
-  gamificationCard: { backgroundColor: colors.cardBackground, borderRadius: 16, padding: 16, marginBottom: 20 },
+  gamificationCard: { borderRadius: 16, padding: 16, marginBottom: 20 },
   
   levelSection: { marginBottom: 16 },
   levelHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
-  levelBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: colors.primary + '20' },
-  levelNumber: { fontSize: typography.sizes.md, fontWeight: typography.weights.bold as any, color: colors.primary },
-  levelTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary },
+  levelBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  levelNumber: { fontSize: typography.sizes.md, fontWeight: typography.weights.bold as any },
+  levelTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any },
   xpRow: { marginBottom: 8 },
-  xpText: { fontSize: typography.sizes.sm, color: colors.textSecondary },
-  progressBar: { height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden' },
-  progressFill: { height: 8, borderRadius: 4, backgroundColor: colors.primary },
+  xpText: { fontSize: typography.sizes.sm },
+  progressBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: 8, borderRadius: 4 },
   
   streakSection: { marginBottom: 16 },
-  streakCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, backgroundColor: colors.warning + '10' },
+  streakCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12 },
   streakInfo: { flex: 1 },
-  streakValue: { fontSize: typography.sizes.xl, fontWeight: typography.weights.bold as any, color: colors.textPrimary },
-  streakLabel: { fontSize: typography.sizes.sm, color: colors.textSecondary },
+  streakValue: { fontSize: typography.sizes.xl, fontWeight: typography.weights.bold as any },
+  streakLabel: { fontSize: typography.sizes.sm },
   
-  statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 20, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border + '50' },
+  statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 20, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1 },
   statItem: { alignItems: 'center', gap: 4 },
-  statValue: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any, color: colors.textPrimary },
-  statLabel: { fontSize: typography.sizes.xs, color: colors.textSecondary },
-  statDivider: { width: 1, height: 40, backgroundColor: colors.border },
+  statValue: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any },
+  statLabel: { fontSize: typography.sizes.xs },
+  statDivider: { width: 1, height: 40 },
   
   badgesSection: { },
-  badgesTitle: { fontSize: typography.sizes.md, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary, marginBottom: 12 },
+  badgesTitle: { fontSize: typography.sizes.md, fontWeight: typography.weights.semiBold as any, marginBottom: 12 },
   badgesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  badgeCard: { width: '30%', aspectRatio: 1, backgroundColor: colors.background, borderRadius: 12, padding: 8, alignItems: 'center', justifyContent: 'center', position: 'relative' as const },
+  badgeCard: { width: '30%', aspectRatio: 1, borderRadius: 12, padding: 8, alignItems: 'center', justifyContent: 'center', position: 'relative' as const },
   badgeIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  checkmark: { position: 'absolute' as const, top: 8, right: 8, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center' },
-  badgeTitle: { fontSize: typography.sizes.xs, fontWeight: typography.weights.medium as any, color: colors.textPrimary, textAlign: 'center' as const },
-  badgeDesc: { fontSize: 9, color: colors.textSecondary, textAlign: 'center' as const, marginTop: 2 },
+  checkmark: { position: 'absolute' as const, top: 8, right: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  badgeTitle: { fontSize: typography.sizes.xs, fontWeight: typography.weights.medium as any, textAlign: 'center' as const },
+  badgeDesc: { fontSize: 9, textAlign: 'center' as const, marginTop: 2 },
   
   editSection: { marginTop: 8 },
-  sectionTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary, marginBottom: 16 },
-  label: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any, color: colors.textSecondary, marginBottom: 6, marginTop: 12 },
-  input: { width: '100%' as any, backgroundColor: colors.cardBackground, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: typography.sizes.md, color: colors.textPrimary, borderWidth: 1, borderColor: colors.border },
+  sectionTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any, marginBottom: 16 },
+  label: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any, marginBottom: 6, marginTop: 12 },
+  input: { width: '100%' as any, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: typography.sizes.md, borderWidth: 1 },
   saveBtn: { width: '100%' as any, marginTop: 24 },
   saveGradient: { paddingVertical: 16, borderRadius: 30, alignItems: 'center' as const },
   saveBtnText: { color: '#FFF', fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any },

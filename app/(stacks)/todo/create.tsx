@@ -17,7 +17,7 @@ type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
 
 export default function CreateTodoScreen() {
   const router = useRouter();
-  const tc = useThemeStore().colors;
+  const { isDark, colors: tc } = useThemeStore();
   const { addTodo } = useTodoStore();
 
   const [title, setTitle] = useState('');
@@ -392,6 +392,7 @@ export default function CreateTodoScreen() {
           value={tempDate}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          themeVariant={isDark ? 'dark' : 'light'}
           onChange={(event, date) => handleDateChange(event, date, 'start')}
           onTouchCancel={() => setShowStartDatePicker(false)}
         />
@@ -402,6 +403,7 @@ export default function CreateTodoScreen() {
           value={tempDate}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          themeVariant={isDark ? 'dark' : 'light'}
           onChange={(event, date) => handleDateChange(event, date, 'end')}
           onTouchCancel={() => setShowEndDatePicker(false)}
         />
@@ -412,6 +414,7 @@ export default function CreateTodoScreen() {
           value={tempDate}
           mode="time"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          themeVariant={isDark ? 'dark' : 'light'}
           onChange={(event, date) => handleDateChange(event, date, 'time')}
           onTouchCancel={() => setShowTimePicker(false)}
         />
@@ -422,6 +425,7 @@ export default function CreateTodoScreen() {
           value={tempDate}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          themeVariant={isDark ? 'dark' : 'light'}
           onChange={(event, date) => handleDateChange(event, date, 'recurringEnd')}
           onTouchCancel={() => setShowRecurringEndPicker(false)}
         />

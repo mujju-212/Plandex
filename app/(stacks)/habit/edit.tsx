@@ -26,7 +26,7 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export default function EditHabitScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const tc = useThemeStore().colors;
+  const { isDark, colors: tc } = useThemeStore();
   const { habits, updateHabit } = useHabitStore();
 
   const [title, setTitle] = useState('');
@@ -180,7 +180,7 @@ export default function EditHabitScreen() {
       </ScrollView>
 
       {Platform.OS !== 'web' && showTimePicker && (
-        <DateTimePicker value={tempDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={handleTimeChange} />
+        <DateTimePicker value={tempDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} themeVariant={isDark ? 'dark' : 'light'} onChange={handleTimeChange} />
       )}
 
       <View style={styles.bottomBar}>

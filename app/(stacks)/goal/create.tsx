@@ -26,7 +26,7 @@ const GOAL_COLORS = ['#4CAF50', '#2196F3', '#E91E63', '#FF9800', '#9C27B0', '#00
 
 export default function CreateGoalScreen() {
   const router = useRouter();
-  const tc = useThemeStore().colors;
+  const { isDark, colors: tc } = useThemeStore();
   const { addGoal } = useGoalStore();
 
   const [title, setTitle] = useState('');
@@ -184,10 +184,10 @@ export default function CreateGoalScreen() {
 
       {/* Date Pickers for Mobile */}
       {Platform.OS !== 'web' && showStartDatePicker && (
-        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'start')} />
+        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} themeVariant={isDark ? 'dark' : 'light'} onChange={(event, date) => handleDateChange(event, date, 'start')} />
       )}
       {Platform.OS !== 'web' && showEndDatePicker && (
-        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'end')} />
+        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} themeVariant={isDark ? 'dark' : 'light'} onChange={(event, date) => handleDateChange(event, date, 'end')} />
       )}
 
       <View style={styles.bottomBar}>

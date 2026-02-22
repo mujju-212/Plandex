@@ -17,6 +17,7 @@ interface ClockState {
   startSession: (input: CreateFocusSessionInput) => Promise<FocusSession>;
   endSession: (id: number, actualSeconds: number, status?: 'completed' | 'cancelled') => Promise<void>;
   loadTodayFocus: () => Promise<void>;
+  clearError: () => void;
 }
 
 export const useClockStore = create<ClockState>((set, get) => ({
@@ -28,7 +29,7 @@ export const useClockStore = create<ClockState>((set, get) => ({
 
   loadAlarms: async () => {
     try {
-      set({ isLoading: true });
+      set({ isLoading: true, error: null });
       const alarms = await clockRepository.getAllAlarms();
       set({ alarms, isLoading: false });
     } catch (e: any) { set({ error: e.message, isLoading: false }); }
@@ -36,6 +37,7 @@ export const useClockStore = create<ClockState>((set, get) => ({
 
   addAlarm: async (input) => {
     try {
+      set({ error: null });
       const alarm = await clockRepository.insertAlarm(input);
       set(s => ({ alarms: [alarm, ...s.alarms] }));
       return alarm;
@@ -44,6 +46,7 @@ export const useClockStore = create<ClockState>((set, get) => ({
 
   updateAlarm: async (id, input) => {
     try {
+      set({ error: null });
       const updated = await clockRepository.updateAlarm(id, input);
       set(s => ({ alarms: s.alarms.map(a => a.id === id ? updated : a) }));
     } catch (e: any) { set({ error: e.message }); }
@@ -51,25 +54,32 @@ export const useClockStore = create<ClockState>((set, get) => ({
 
   deleteAlarm: async (id) => {
     try {
+      set({ error: null });
       await clockRepository.deleteAlarm(id);
       set(s => ({ alarms: s.alarms.filter(a => a.id !== id) }));
     } catch (e: any) { set({ error: e.message }); }
   },
 
   toggleAlarm: async (id) => {
-    const alarm = get().alarms.find(a => a.id === id);
-    if (alarm) await get().updateAlarm(id, { is_enabled: !alarm.is_enabled });
+    try {
+      set({ error: null });
+      const alarm = get().alarms.find(a => a.id === id);
+      if (!alarm) throw new Error('Alarm not found');
+      await get().updateAlarm(id, { is_enabled: !alarm.is_enabled });
+    } catch (e: any) { set({ error: e.message }); }
   },
 
   loadSessions: async () => {
     try {
+      set({ isLoading: true, error: null });
       const sessions = await clockRepository.getRecentSessions();
-      set({ sessions });
-    } catch (e: any) { set({ error: e.message }); }
+      set({ sessions, isLoading: false });
+    } catch (e: any) { set({ error: e.message, isLoading: false }); }
   },
 
   startSession: async (input) => {
     try {
+      set({ error: null });
       const session = await clockRepository.insertSession(input);
       set(s => ({ sessions: [session, ...s.sessions] }));
       return session;
@@ -78,6 +88,7 @@ export const useClockStore = create<ClockState>((set, get) => ({
 
   endSession: async (id, actualSeconds, status = 'completed') => {
     try {
+      set({ error: null });
       await clockRepository.completeSession(id, actualSeconds, status);
       set(s => ({ sessions: s.sessions.map(sess => sess.id === id ? { ...sess, actual_seconds: actualSeconds, status, completed_at: new Date().toISOString() } : sess) }));
       await get().loadTodayFocus();
@@ -86,8 +97,11 @@ export const useClockStore = create<ClockState>((set, get) => ({
 
   loadTodayFocus: async () => {
     try {
+      set({ error: null });
       const todayFocusMinutes = await clockRepository.getTodayFocusMinutes();
       set({ todayFocusMinutes });
     } catch (e: any) { set({ error: e.message }); }
   },
+
+  clearError: () => set({ error: null }),
 }));

@@ -37,7 +37,7 @@ export const useEventStore = create<EventState>((set, get) => ({
 
     loadEventsForDate: async (date: string) => {
         try {
-            set({ isLoading: true });
+            set({ isLoading: true, error: null });
             const events = await eventService.getEventsForDate(date);
             set({ events, isLoading: false });
         } catch (error: any) {
@@ -47,6 +47,7 @@ export const useEventStore = create<EventState>((set, get) => ({
 
     addEvent: async (input: CreateEventInput) => {
         try {
+            set({ error: null });
             const event = await eventService.createEvent(input);
             // Schedule reminder 15 minutes before event
             scheduleEventReminder(event.id, event.title, event.start_datetime).catch(() => {});
@@ -60,6 +61,7 @@ export const useEventStore = create<EventState>((set, get) => ({
 
     updateEvent: async (id: number, input: UpdateEventInput) => {
         try {
+            set({ error: null });
             const event = await eventService.updateEvent(id, input);
             set(state => ({
                 events: state.events.map(e => e.id === id ? event : e),
@@ -72,6 +74,7 @@ export const useEventStore = create<EventState>((set, get) => ({
 
     deleteEvent: async (id: number) => {
         try {
+            set({ error: null });
             await eventService.deleteEvent(id);
             set(state => ({
                 events: state.events.filter(e => e.id !== id),
@@ -84,9 +87,11 @@ export const useEventStore = create<EventState>((set, get) => ({
 
     completeEvent: async (id: number) => {
         try {
+            set({ error: null });
             const event = await eventService.completeEvent(id);
             set(state => ({
                 events: state.events.map(e => e.id === id ? event : e),
+                selectedEvent: state.selectedEvent?.id === id ? event : state.selectedEvent,
             }));
         } catch (error: any) {
             set({ error: error.message });

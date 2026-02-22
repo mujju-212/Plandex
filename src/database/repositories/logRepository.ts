@@ -1,7 +1,7 @@
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import { CreateDailyLogInput, DailyLog, UpdateDailyLogInput } from '../../types/log.types';
 import { getDB } from '../database';
-import { DailyLog, CreateDailyLogInput, UpdateDailyLogInput } from '../../types/log.types';
 
 const LOGS_STORAGE_KEY = 'myplanner_daily_logs';
 
@@ -72,13 +72,28 @@ class LogRepository {
         const db = getDB();
         const tagsJson = JSON.stringify(input.tags || []);
 
-        // Use INSERT OR REPLACE since date is UNIQUE
+        // Use INSERT ... ON CONFLICT to preserve id and created_at on update
         await db.runAsync(
-            `INSERT OR REPLACE INTO daily_logs (
+            `INSERT INTO daily_logs (
                 date, what_i_did, achievements, learnings, challenges,
                 tomorrow_intention, gratitude, productivity_rating, satisfaction_rating,
                 completion_rating, energy_rating, overall_rating, mood, tags, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(date) DO UPDATE SET
+                what_i_did = excluded.what_i_did,
+                achievements = excluded.achievements,
+                learnings = excluded.learnings,
+                challenges = excluded.challenges,
+                tomorrow_intention = excluded.tomorrow_intention,
+                gratitude = excluded.gratitude,
+                productivity_rating = excluded.productivity_rating,
+                satisfaction_rating = excluded.satisfaction_rating,
+                completion_rating = excluded.completion_rating,
+                energy_rating = excluded.energy_rating,
+                overall_rating = excluded.overall_rating,
+                mood = excluded.mood,
+                tags = excluded.tags,
+                updated_at = CURRENT_TIMESTAMP`,
             [
                 input.date,
                 input.what_i_did || null,
@@ -118,7 +133,7 @@ class LogRepository {
         }
 
         const db = getDB();
-        const rows = await db.getAllAsync('SELECT * FROM daily_logs ORDER BY date DESC');
+        const rows = await db.getAllAsync('SELECT * FROM daily_logs ORDER BY date DESC LIMIT 365');
         return rows.map((row: any) => this.mapRowToLog(row));
     }
 
@@ -158,7 +173,13 @@ class LogRepository {
             mappedInput.tags = JSON.stringify(input.tags);
         }
 
-        const keys = Object.keys(mappedInput);
+        const ALLOWED_COLUMNS = new Set([
+            'what_i_did', 'achievements', 'learnings', 'challenges',
+            'tomorrow_intention', 'gratitude', 'productivity_rating',
+            'satisfaction_rating', 'completion_rating', 'energy_rating',
+            'overall_rating', 'mood', 'tags',
+        ]);
+        const keys = Object.keys(mappedInput).filter(k => ALLOWED_COLUMNS.has(k));
         if (keys.length === 0) return current;
 
         const setClause = keys.map(k => `${k} = ?`).join(', ');

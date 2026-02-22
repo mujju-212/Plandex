@@ -87,7 +87,7 @@ class GamificationService {
     }
 
     async awardXP(action: keyof typeof XP_AWARDS, customAmount?: number) {
-        const amount = customAmount || XP_AWARDS[action];
+        const amount = customAmount ?? XP_AWARDS[action];
 
         try {
             if (Platform.OS === 'web') {
@@ -107,7 +107,11 @@ class GamificationService {
                     const statsRow = await db.getAllAsync<{ total_xp: number; current_level: number; current_log_streak: number; total_todos_completed: number }>(
                         'SELECT total_xp, current_level, current_log_streak, total_todos_completed FROM user_stats LIMIT 1'
                     );
-                    if (!statsRow.length) return;
+                    if (!statsRow.length) {
+                        // Init stats row if missing
+                        await db.runAsync('INSERT INTO user_stats (total_xp, current_level) VALUES (?, ?)', [amount, this.computeLevel(amount)]);
+                        return;
+                    }
                     const stats = statsRow[0];
                     const newXp = stats.total_xp + amount;
                     const newLevel = this.computeLevel(newXp);
@@ -125,15 +129,32 @@ class GamificationService {
     }
 
     async incrementStat(statName: 'total_todos_completed' | 'current_log_streak') {
+        // Allowlist guard to prevent SQL injection via string interpolation
+        const ALLOWED_COLUMNS = ['total_todos_completed', 'current_log_streak'] as const;
+        if (!ALLOWED_COLUMNS.includes(statName)) {
+            throw new Error(`Invalid stat name: ${statName}`);
+        }
         try {
             if (Platform.OS === 'web') {
                 const stats = await this.getWebStats();
                 stats[statName] = (stats[statName] || 0) + 1;
+                // Keep longest_log_streak in sync
+                if (statName === 'current_log_streak' && stats.current_log_streak > (stats.longest_log_streak || 0)) {
+                    stats.longest_log_streak = stats.current_log_streak;
+                }
                 await this.setWebStats(stats);
                 await this.saveBadges(stats);
             } else {
                 const db = getDB();
-                await db.runAsync(`UPDATE user_stats SET ${statName} = ${statName} + 1`);
+                await db.runAsync(
+                    `UPDATE user_stats SET ${statName} = ${statName} + 1`
+                );
+                // Keep longest_log_streak in sync
+                if (statName === 'current_log_streak') {
+                    await db.runAsync(
+                        'UPDATE user_stats SET longest_log_streak = MAX(longest_log_streak, current_log_streak)'
+                    );
+                }
                 // Re-read and check badges after increment
                 const rows = await db.getAllAsync<any>('SELECT total_xp, current_level, current_log_streak, total_todos_completed FROM user_stats LIMIT 1');
                 if (rows.length) await this.saveBadges(rows[0]);

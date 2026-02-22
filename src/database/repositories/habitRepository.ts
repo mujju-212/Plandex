@@ -92,7 +92,7 @@ class HabitRepository {
         if (filter?.category) { query += ' AND category = ?'; params.push(filter.category); }
         if (filter?.is_active !== undefined) { query += ' AND is_active = ?'; params.push(filter.is_active ? 1 : 0); }
         if (filter?.search) { query += ' AND title LIKE ?'; params.push(`%${filter.search}%`); }
-        query += ' ORDER BY created_at DESC';
+        query += ' ORDER BY created_at DESC LIMIT 200';
 
         const rows = await db.getAllAsync(query, params);
         return rows.map((r: any) => mapRowToHabit(r));
@@ -128,7 +128,12 @@ class HabitRepository {
         if (input.specific_days) mappedInput.specific_days = JSON.stringify(input.specific_days);
         if (input.is_active !== undefined) mappedInput.is_active = input.is_active ? 1 : 0;
 
-        const keys = Object.keys(mappedInput);
+        const ALLOWED_COLUMNS = new Set([
+            'title', 'description', 'category', 'frequency_type', 'specific_days',
+            'times_per_week', 'time_of_day', 'reminder_time', 'color', 'icon',
+            'is_active', 'start_date', 'end_date',
+        ]);
+        const keys = Object.keys(mappedInput).filter(k => ALLOWED_COLUMNS.has(k));
         if (keys.length === 0) return current;
 
         const setClause = keys.map(k => `${k} = ?`).join(', ');
@@ -166,12 +171,21 @@ class HabitRepository {
             completions.push(comp);
             await saveWebCompletions(completions);
 
-            // Update streak on web
+            // Update streak on web — check if yesterday was completed
             const habits = await getWebHabits();
             const idx = habits.findIndex(h => h.id === habitId);
             if (idx !== -1) {
+                const yesterday = new Date(date);
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = yesterday.toISOString().split('T')[0];
+                const yesterdayDone = completions.some(c => c.habit_id === habitId && c.date === yesterdayStr);
+
                 habits[idx].total_completions += 1;
-                habits[idx].current_streak += 1;
+                if (yesterdayDone) {
+                    habits[idx].current_streak += 1;
+                } else {
+                    habits[idx].current_streak = 1;
+                }
                 if (habits[idx].current_streak > habits[idx].longest_streak) {
                     habits[idx].longest_streak = habits[idx].current_streak;
                 }
@@ -190,23 +204,50 @@ class HabitRepository {
         );
         if (existing.length > 0) return mapRowToCompletion(existing[0]);
 
-        const result = await db.runAsync(
-            'INSERT INTO habit_completions (habit_id, date, notes) VALUES (?, ?, ?)',
-            [habitId, date, notes || null]
-        );
+        // Use transaction to ensure INSERT + streak UPDATE are atomic
+        let insertId = 0;
+        await db.withTransactionAsync(async () => {
+            const result = await db.runAsync(
+                'INSERT INTO habit_completions (habit_id, date, notes) VALUES (?, ?, ?)',
+                [habitId, date, notes || null]
+            );
+            insertId = result.lastInsertRowId;
 
-        // Update streak counters
-        await db.runAsync(
-            `UPDATE habits SET
-             total_completions = total_completions + 1,
-             current_streak = current_streak + 1,
-             longest_streak = MAX(longest_streak, current_streak + 1),
-             updated_at = CURRENT_TIMESTAMP
-             WHERE id = ?`,
-            [habitId]
-        );
+            // Check if yesterday was completed to decide streak logic
+            const yesterday = new Date(date);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            const yesterdayCompletion = await db.getAllAsync(
+                'SELECT id FROM habit_completions WHERE habit_id = ? AND date = ?',
+                [habitId, yesterdayStr]
+            );
+            const continueStreak = yesterdayCompletion.length > 0;
 
-        const rows = await db.getAllAsync('SELECT * FROM habit_completions WHERE id = ?', [result.lastInsertRowId]);
+            // Update streak counters — reset to 1 if yesterday wasn't completed
+            if (continueStreak) {
+                await db.runAsync(
+                    `UPDATE habits SET
+                     total_completions = total_completions + 1,
+                     current_streak = current_streak + 1,
+                     longest_streak = MAX(longest_streak, current_streak + 1),
+                     updated_at = CURRENT_TIMESTAMP
+                     WHERE id = ?`,
+                    [habitId]
+                );
+            } else {
+                await db.runAsync(
+                    `UPDATE habits SET
+                     total_completions = total_completions + 1,
+                     current_streak = 1,
+                     longest_streak = MAX(longest_streak, 1),
+                     updated_at = CURRENT_TIMESTAMP
+                     WHERE id = ?`,
+                    [habitId]
+                );
+            }
+        });
+
+        const rows = await db.getAllAsync('SELECT * FROM habit_completions WHERE id = ?', [insertId]);
         return mapRowToCompletion(rows[0]);
     }
 

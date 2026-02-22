@@ -26,7 +26,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
     const handleExport = async () => {
         try {
             const json = await exportAllData();
-            downloadJSON(json, `myplanner_backup_${new Date().toISOString().split('T')[0]}.json`);
+            downloadJSON(json, `plandex_backup_${new Date().toISOString().split('T')[0]}.json`);
             onClose();
         } catch (e: any) { }
     };

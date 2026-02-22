@@ -11,6 +11,7 @@ interface NoteState {
   updateNote: (id: number, input: UpdateNoteInput) => Promise<void>;
   deleteNote: (id: number) => Promise<void>;
   togglePin: (id: number) => Promise<void>;
+  clearError: () => void;
 }
 
 export const useNoteStore = create<NoteState>((set, get) => ({
@@ -28,6 +29,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
   addNote: async (input) => {
     try {
+      set({ error: null });
       const note = await noteRepository.insert(input);
       set(s => ({ notes: [note, ...s.notes] }));
       return note;
@@ -36,6 +38,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
   updateNote: async (id, input) => {
     try {
+      set({ error: null });
       const updated = await noteRepository.update(id, input);
       set(s => ({ notes: s.notes.map(n => n.id === id ? updated : n) }));
     } catch (e: any) { set({ error: e.message }); }
@@ -43,15 +46,20 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
   deleteNote: async (id) => {
     try {
+      set({ error: null });
       await noteRepository.delete(id);
       set(s => ({ notes: s.notes.filter(n => n.id !== id) }));
     } catch (e: any) { set({ error: e.message }); }
   },
 
   togglePin: async (id) => {
-    const note = get().notes.find(n => n.id === id);
-    if (note) {
+    try {
+      set({ error: null });
+      const note = get().notes.find(n => n.id === id);
+      if (!note) throw new Error('Note not found');
       await get().updateNote(id, { is_pinned: !note.is_pinned });
-    }
+    } catch (e: any) { set({ error: e.message }); }
   },
+
+  clearError: () => set({ error: null }),
 }));

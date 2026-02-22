@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, ScrollView, Pressable } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../../src/theme/colors';
-import { typography } from '../../src/theme/typography';
-import { useTodoStore } from '../../src/stores/useTodoStore';
+import { Stack, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useEventStore } from '../../src/stores/useEventStore';
 import { useGoalStore } from '../../src/stores/useGoalStore';
 import { useHabitStore } from '../../src/stores/useHabitStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
+import { useTodoStore } from '../../src/stores/useTodoStore';
+import { typography } from '../../src/theme/typography';
 
 type SearchResult = {
   id: number;
@@ -140,18 +139,18 @@ export default function SearchScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 50, paddingBottom: 8, gap: 12 },
-  headerBtn: { padding: 8, borderRadius: 20, backgroundColor: colors.cardBackground },
-  searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBackground, borderRadius: 14, paddingHorizontal: 14, gap: 8 },
-  searchInput: { flex: 1, paddingVertical: 12, fontSize: typography.sizes.md, color: colors.textPrimary },
+  headerBtn: { padding: 8, borderRadius: 20 },
+  searchBox: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 14, gap: 8 },
+  searchInput: { flex: 1, paddingVertical: 12, fontSize: typography.sizes.md },
   content: { padding: 20, paddingBottom: 40 },
   emptyState: { alignItems: 'center' as const, paddingTop: 80 },
-  emptyText: { marginTop: 16, fontSize: typography.sizes.md, color: colors.textSecondary, textAlign: 'center' as const },
-  resultCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBackground, borderRadius: 14, padding: 14, marginBottom: 10, gap: 12 },
+  emptyText: { marginTop: 16, fontSize: typography.sizes.md, textAlign: 'center' as const },
+  resultCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, marginBottom: 10, gap: 12 },
   iconCircle: { width: 40, height: 40, borderRadius: 20, alignItems: 'center' as const, justifyContent: 'center' as const },
-  resultTitle: { fontSize: typography.sizes.md, fontWeight: typography.weights.medium as any, color: colors.textPrimary },
-  resultSubtitle: { fontSize: typography.sizes.xs, color: colors.textSecondary, marginTop: 2 },
+  resultTitle: { fontSize: typography.sizes.md, fontWeight: typography.weights.medium as any },
+  resultSubtitle: { fontSize: typography.sizes.xs, marginTop: 2 },
   typeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   typeBadgeText: { fontSize: typography.sizes.xs, fontWeight: typography.weights.semiBold as any },
 });

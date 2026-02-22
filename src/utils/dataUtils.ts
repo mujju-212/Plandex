@@ -34,7 +34,64 @@ const SQLITE_TABLES = [
   'user_badges',
   'user_stats',
   'events',
+  'sticky_notes',
+  'mood_entries',
+  'expenses',
+  'expense_categories',
+  'planning_files',
+  'planning_notes',
+  'planning_projects',
+  'focus_sessions',
+  'alarms',
 ];
+
+// ─── Column whitelist per table (prevents SQL injection on import) ───
+const TABLE_COLUMNS: Record<string, Set<string>> = {
+  habit_completions: new Set(['id', 'habit_id', 'date', 'completed_at', 'notes']),
+  habits: new Set([
+    'id', 'title', 'description', 'category', 'frequency_type', 'specific_days',
+    'times_per_week', 'time_of_day', 'reminder_time', 'color', 'icon',
+    'current_streak', 'longest_streak', 'total_completions', 'is_active',
+    'start_date', 'end_date', 'created_at', 'updated_at',
+  ]),
+  goal_milestones: new Set(['id', 'goal_id', 'title', 'is_completed', 'completed_at', 'position']),
+  goals: new Set([
+    'id', 'title', 'description', 'category', 'priority', 'status', 'progress',
+    'target_value', 'current_value', 'unit', 'start_date', 'end_date',
+    'completion_notes', 'created_at', 'updated_at',
+  ]),
+  todos: new Set([
+    'id', 'list_id', 'title', 'description', 'priority', 'status', 'date_type',
+    'start_date', 'end_date', 'due_time', 'is_recurring', 'tags', 'position',
+    'created_at', 'updated_at', 'completed_at',
+  ]),
+  todo_lists: new Set(['id', 'name', 'color', 'icon', 'position', 'is_default', 'created_at']),
+  daily_logs: new Set([
+    'id', 'date', 'what_i_did', 'achievements', 'learnings', 'challenges',
+    'tomorrow_intention', 'gratitude', 'productivity_rating', 'satisfaction_rating',
+    'completion_rating', 'energy_rating', 'overall_rating', 'mood', 'tags',
+    'created_at', 'updated_at',
+  ]),
+  user_badges: new Set(['badge_id']),
+  user_stats: new Set([
+    'id', 'total_xp', 'current_level', 'current_log_streak',
+    'longest_log_streak', 'total_todos_completed', 'last_active_date',
+  ]),
+  events: new Set([
+    'id', 'title', 'description', 'start_datetime', 'end_datetime', 'location',
+    'color', 'reminder_minutes', 'is_all_day', 'recurrence', 'status',
+    'created_at', 'updated_at',
+  ]),
+  sticky_notes: new Set(['id', 'content', 'color', 'position_x', 'position_y', 'width', 'height', 'created_at', 'updated_at']),
+  mood_entries: new Set(['id', 'date', 'mood', 'energy', 'notes', 'factors', 'created_at']),
+  expenses: new Set(['id', 'amount', 'category_id', 'description', 'date', 'payment_method', 'notes', 'created_at']),
+  expense_categories: new Set(['id', 'name', 'icon', 'color', 'budget', 'is_default']),
+  planning_files: new Set(['id', 'project_id', 'name', 'uri', 'type', 'size', 'created_at']),
+  planning_notes: new Set(['id', 'project_id', 'title', 'content', 'created_at', 'updated_at']),
+  planning_projects: new Set(['id', 'name', 'description', 'color', 'icon', 'status', 'created_at', 'updated_at']),
+  focus_sessions: new Set(['id', 'session_type', 'duration_minutes', 'actual_seconds', 'status', 'started_at', 'ended_at', 'linked_todo_id']),
+  alarms: new Set(['id', 'time', 'label', 'is_enabled', 'repeat_days', 'sound', 'created_at']),
+};
 
 // ═══════════════════════════════════════════════════════════
 //  EXPORT — collects all data into one JSON string
@@ -89,8 +146,11 @@ export async function importAllData(jsonString: string): Promise<void> {
     throw new Error('Invalid backup file: ' + e.message);
   }
 
-  if (!data._version) {
-    throw new Error('Not a valid MyPlanner backup file.');
+  if (!data._version || typeof data._version !== 'string') {
+    throw new Error('Not a valid Plandex backup file.');
+  }
+  if (typeof data._exportedAt !== 'string') {
+    throw new Error('Backup file is missing export timestamp.');
   }
 
   if (Platform.OS === 'web') {
@@ -138,7 +198,11 @@ export async function importAllData(jsonString: string): Promise<void> {
 
       for (const row of rows) {
         try {
-          const keys = Object.keys(row);
+          // Only allow whitelisted column names to prevent SQL injection
+          const whitelist = TABLE_COLUMNS[table];
+          if (!whitelist) continue;
+          const keys = Object.keys(row).filter(k => whitelist.has(k));
+          if (keys.length === 0) continue;
           const placeholders = keys.map(() => '?').join(', ');
           const values = keys.map(k => {
             const v = row[k];
@@ -186,6 +250,17 @@ export async function clearAllData(): Promise<void> {
       await db.runAsync(
         "INSERT INTO todo_lists (name, color, icon, position, is_default) VALUES ('General', '#1A73E8', 'playlist-check', 0, 1)",
       );
+      await db.execAsync(`
+        INSERT INTO expense_categories (name, icon, color, is_default) VALUES
+          ('Food & Drinks', 'restaurant', '#FF7042', 1),
+          ('Transport', 'directions-car', '#42A5F5', 1),
+          ('Shopping', 'shopping-bag', '#AB47BC', 1),
+          ('Bills', 'receipt', '#26A69A', 1),
+          ('Entertainment', 'movie', '#FFA726', 1),
+          ('Health', 'local-hospital', '#EF5350', 1),
+          ('Education', 'school', '#5C6BC0', 1),
+          ('Other', 'more-horiz', '#78909C', 1);
+      `);
     } catch { }
   }
 }
@@ -217,7 +292,7 @@ export async function downloadJSON(jsonString: string, filename: string): Promis
     if (canShare) {
       await Sharing.shareAsync(filePath, {
         mimeType: 'application/json',
-        dialogTitle: 'Save MyPlanner Backup',
+        dialogTitle: 'Save Plandex Backup',
         UTI: 'public.json',
       });
     }

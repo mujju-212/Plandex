@@ -5,8 +5,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as StoreReview from 'expo-store-review';
+import * as Updates from 'expo-updates';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import Sidebar from '../../src/components/common/Sidebar';
 import { requestNotificationPermissions } from '../../src/services/notificationService';
 import { useGamificationStore } from '../../src/stores/useGamificationStore';
@@ -135,6 +136,66 @@ export default function MoreTab() {
     } catch { }
   };
 
+  const APP_VERSION = '1.0.0';
+  const GITHUB_REPO = 'https://github.com/mujju-212/myplanner';
+  const CONTACT_EMAIL = 'mujju786492@gmail.com';
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  const handleOpenRepo = () => {
+    Linking.openURL(GITHUB_REPO);
+  };
+
+  const handleContactEmail = () => {
+    Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=MyPlanner%20-%20Feedback`);
+  };
+
+  const handleCheckForUpdates = async () => {
+    setCheckingUpdate(true);
+    try {
+      // Try OTA update first (only works in production builds, not in dev/Expo Go)
+      if (!__DEV__) {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          setCheckingUpdate(false);
+          Alert.alert(
+            'Update Downloaded! 🎉',
+            'A new update has been downloaded and is ready to install.',
+            [
+              { text: 'Later', style: 'cancel' },
+              { text: 'Restart Now', onPress: () => Updates.reloadAsync() },
+            ],
+          );
+          return;
+        }
+      }
+      // Fallback: check GitHub releases for new APK versions
+      const response = await fetch('https://api.github.com/repos/mujju-212/myplanner/releases/latest', {
+        headers: { Accept: 'application/vnd.github.v3+json' },
+      });
+      if (response.ok) {
+        const release = await response.json();
+        const latestVersion = (release.tag_name || '').replace(/^v/, '');
+        if (latestVersion && latestVersion !== APP_VERSION) {
+          Alert.alert(
+            'Update Available! 🎉',
+            `A new version (${latestVersion}) is available. You are on version ${APP_VERSION}.\n\n${release.name || ''}`,
+            [
+              { text: 'Later', style: 'cancel' },
+              { text: 'Download', onPress: () => Linking.openURL(release.html_url || `${GITHUB_REPO}/releases`) },
+            ],
+          );
+          return;
+        }
+      }
+      Alert.alert('Up to Date ✨', `You are running the latest version (${APP_VERSION}).`);
+    } catch (e: any) {
+      Alert.alert('Error', 'Unable to check for updates. Please try again later.');
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]}>
       <Sidebar visible={showSidebar} onClose={() => setShowSidebar(false)} />
@@ -249,10 +310,28 @@ export default function MoreTab() {
           <MenuItem icon="delete-outline" title="Clear All Data" subtitle="Delete everything" iconBg={themeColors.danger + '20'} iconColor={themeColors.danger} onPress={handleClear} />
         </View>
 
+        {/* Help & Support Section */}
+        <Text style={[styles.sectionLabel, { color: themeColors.textSecondary }]}>Help & Support</Text>
+        <View style={[styles.menuGroup, { backgroundColor: themeColors.cardBackground }]}>
+          <MenuItem icon="github" iconFamily="feather" title="GitHub Repo" subtitle="Source code & issues" onPress={handleOpenRepo} />
+          <MenuItem icon="mail" iconFamily="feather" title="Contact Us" subtitle={CONTACT_EMAIL} onPress={handleContactEmail} />
+        </View>
+
         {/* About Section */}
         <Text style={[styles.sectionLabel, { color: themeColors.textSecondary }]}>About</Text>
         <View style={[styles.menuGroup, { backgroundColor: themeColors.cardBackground }]}>
-          <MenuItem icon="info" title="About MyPlanner" subtitle="Version 1.0.0" />
+          <MenuItem icon="info" title="About MyPlanner" subtitle={`Version ${APP_VERSION}`} />
+          <MenuItem
+            icon="system-update"
+            title="Check for Updates"
+            subtitle="Get the latest version"
+            onPress={handleCheckForUpdates}
+            rightElement={
+              checkingUpdate
+                ? <ActivityIndicator size="small" color={themeColors.primary} />
+                : <MaterialIcons name="chevron-right" size={22} color={themeColors.textSecondary} />
+            }
+          />
           <MenuItem icon="star" title="Rate App" subtitle="Love it? Leave a review!" onPress={handleRateApp} />
           <MenuItem icon="share" iconFamily="feather" title="Share with Friends" subtitle="Spread the word" onPress={handleShareApp} />
         </View>

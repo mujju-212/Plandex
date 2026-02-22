@@ -67,7 +67,12 @@ export const usePlanningStore = create<PlanningState>((set, get) => ({
   deleteProject: async (id) => {
     try {
       await planningRepository.deleteProject(id);
-      set(s => ({ projects: s.projects.filter(p => p.id !== id) }));
+      set(s => ({
+        projects: s.projects.filter(p => p.id !== id),
+        currentProject: s.currentProject?.id === id ? null : s.currentProject,
+        notes: s.currentProject?.id === id ? [] : s.notes,
+        files: s.currentProject?.id === id ? [] : s.files,
+      }));
     } catch (e: any) { set({ error: e.message }); }
   },
 

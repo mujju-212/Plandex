@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { DailyLog, CreateDailyLogInput, UpdateDailyLogInput } from '../types/log.types';
 import { logService } from '../services/logService';
+import { CreateDailyLogInput, DailyLog, UpdateDailyLogInput } from '../types/log.types';
 
 interface LogState {
     logs: DailyLog[];
@@ -56,6 +56,7 @@ export const useLogStore = create<LogState>((set, get) => ({
 
     saveLog: async (input: CreateDailyLogInput) => {
         try {
+            set({ error: null });
             const log = await logService.saveDailyLog(input);
             set(state => ({
                 logs: [log, ...state.logs.filter(l => l.date !== log.date)],
@@ -70,6 +71,7 @@ export const useLogStore = create<LogState>((set, get) => ({
 
     updateLog: async (date: string, input: UpdateDailyLogInput) => {
         try {
+            set({ error: null });
             const log = await logService.updateDailyLog(date, input);
             set(state => ({
                 logs: state.logs.map(l => l.date === date ? log : l),
@@ -82,6 +84,7 @@ export const useLogStore = create<LogState>((set, get) => ({
 
     deleteLog: async (date: string) => {
         try {
+            set({ error: null });
             await logService.deleteDailyLog(date);
             set(state => ({
                 logs: state.logs.filter(l => l.date !== date),

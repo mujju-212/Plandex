@@ -121,13 +121,28 @@ class GoalRepository {
         if (filter?.status) { query += ' AND status = ?'; params.push(filter.status); }
         if (filter?.priority) { query += ' AND priority = ?'; params.push(filter.priority); }
         if (filter?.search) { query += ' AND title LIKE ?'; params.push(`%${filter.search}%`); }
-        query += ' ORDER BY created_at DESC';
+        query += ' ORDER BY created_at DESC LIMIT 200';
 
         const rows = await db.getAllAsync(query, params);
+        if (rows.length === 0) return [];
+
+        // Batch-load all milestones for retrieved goals to avoid N+1 queries
+        const goalIds = (rows as any[]).map(r => r.id);
+        const placeholders = goalIds.map(() => '?').join(',');
+        const allMilestoneRows = await db.getAllAsync(
+            `SELECT * FROM goal_milestones WHERE goal_id IN (${placeholders}) ORDER BY position ASC`,
+            goalIds
+        );
+        const milestoneMap = new Map<number, GoalMilestone[]>();
+        for (const mr of allMilestoneRows as any[]) {
+            const ms = mapRowToMilestone(mr);
+            if (!milestoneMap.has(ms.goal_id)) milestoneMap.set(ms.goal_id, []);
+            milestoneMap.get(ms.goal_id)!.push(ms);
+        }
+
         const goals: Goal[] = [];
         for (const row of rows as any[]) {
-            const milestones = await this.loadMilestones(row.id);
-            goals.push(mapRowToGoal(row, milestones));
+            goals.push(mapRowToGoal(row, milestoneMap.get(row.id) || []));
         }
         return goals;
     }
@@ -167,7 +182,12 @@ class GoalRepository {
             mappedInput.completed_at = new Date().toISOString();
         }
 
-        const keys = Object.keys(mappedInput);
+        const ALLOWED_COLUMNS = new Set([
+            'title', 'description', 'category', 'goal_type', 'target_value',
+            'current_value', 'unit', 'duration_type', 'start_date', 'end_date',
+            'status', 'priority', 'color', 'icon', 'completed_at', 'completion_notes',
+        ]);
+        const keys = Object.keys(mappedInput).filter(k => ALLOWED_COLUMNS.has(k));
         if (keys.length === 0) return current;
 
         const setClause = keys.map(k => `${k} = ?`).join(', ');
@@ -209,17 +229,31 @@ class GoalRepository {
         }
 
         const db = getDB();
-        await db.runAsync(
-            `UPDATE goal_milestones SET is_completed = 1, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND goal_id = ?`,
-            [milestoneId, goalId]
-        );
-        await db.runAsync(
-            'UPDATE goals SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            [goalId]
-        );
+
+        // Verify goal and milestone exist before updating
         const goal = await this.findById(goalId);
         if (!goal) throw new Error('Goal not found');
-        return goal;
+
+        const milestoneRows = await db.getAllAsync(
+            'SELECT * FROM goal_milestones WHERE id = ? AND goal_id = ?',
+            [milestoneId, goalId]
+        );
+        if (milestoneRows.length === 0) throw new Error('Milestone not found');
+        if ((milestoneRows[0] as any).is_completed) return goal;
+
+        // Wrap milestone + goal update in a transaction
+        await db.withTransactionAsync(async () => {
+            await db.runAsync(
+                `UPDATE goal_milestones SET is_completed = 1, completed_at = CURRENT_TIMESTAMP WHERE id = ? AND goal_id = ?`,
+                [milestoneId, goalId]
+            );
+            await db.runAsync(
+                'UPDATE goals SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [goalId]
+            );
+        });
+
+        return (await this.findById(goalId))!;
     }
 
     async updateProgress(goalId: number, value: number): Promise<Goal> {

@@ -44,7 +44,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
 
     loadTodosForDate: async (date: string) => {
         try {
-            set({ isLoading: true });
+            set({ isLoading: true, error: null });
             const todos = await todoService.getTodosForDate(date);
             set({ todos, isLoading: false });
         } catch (error: any) {
@@ -54,6 +54,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
 
     addTodo: async (input: CreateTodoInput) => {
         try {
+            set({ error: null });
             const todo = await todoService.createTodo(input);
             // Schedule notification if todo has a due date
             if (todo.start_date) {
@@ -69,6 +70,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
 
     completeTodo: async (id: number, notesAfter?: string) => {
         try {
+            set({ error: null });
             const todo = await todoService.completeTodo(id, notesAfter);
             set(state => ({
                 todos: state.todos.map(t => t.id === id ? todo : t),
@@ -81,6 +83,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
 
     uncompleteTodo: async (id: number) => {
         try {
+            set({ error: null });
             const todo = await todoService.updateTodo(id, { status: 'pending' });
             set(state => ({
                 todos: state.todos.map(t => t.id === id ? todo : t),
@@ -93,6 +96,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
 
     updateTodo: async (id: number, input: UpdateTodoInput) => {
         try {
+            set({ error: null });
             const todo = await todoService.updateTodo(id, input);
             set(state => ({
                 todos: state.todos.map(t => t.id === id ? todo : t),
@@ -105,6 +109,7 @@ export const useTodoStore = create<TodoState>((set, get) => ({
 
     deleteTodo: async (id: number) => {
         try {
+            set({ error: null });
             await todoService.deleteTodo(id);
             set(state => ({
                 todos: state.todos.filter(t => t.id !== id),
@@ -117,9 +122,11 @@ export const useTodoStore = create<TodoState>((set, get) => ({
 
     archiveTodo: async (id: number) => {
         try {
+            set({ error: null });
             await todoService.archiveTodo(id);
             set(state => ({
                 todos: state.todos.filter(t => t.id !== id),
+                selectedTodo: state.selectedTodo?.id === id ? null : state.selectedTodo,
             }));
         } catch (error: any) {
             set({ error: error.message });

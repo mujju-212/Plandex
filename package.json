@@ -1,7 +1,12 @@
 {
-  "name": "myplanner",
+  "name": "plandex",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "expo": {
+    "install": {
+      "exclude": ["@react-native-community/datetimepicker"]
+    }
+  },
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -39,6 +44,7 @@
     "expo-store-review": "~9.0.9",
     "expo-symbols": "~1.0.8",
     "expo-system-ui": "~6.0.9",
+    "expo-updates": "~29.0.16",
     "expo-web-browser": "~15.0.10",
     "jszip": "^3.10.1",
     "react": "19.1.0",

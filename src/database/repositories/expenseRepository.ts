@@ -80,7 +80,7 @@ class ExpenseRepository {
     if (filter?.category_id) { conditions.push('e.category_id = ?'); params.push(filter.category_id); }
     if (filter?.expense_type) { conditions.push('e.expense_type = ?'); params.push(filter.expense_type); }
     if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
-    sql += ' ORDER BY e.date DESC, e.created_at DESC';
+    sql += ' ORDER BY e.date DESC, e.created_at DESC LIMIT 500';
     const rows = await db.getAllAsync(sql, params);
     return rows.map(mapExpenseRow);
   }
@@ -128,12 +128,18 @@ class ExpenseRepository {
 
   async getSummary(startDate: string, endDate: string): Promise<ExpenseSummary> {
     const all = await this.findAll({ startDate, endDate });
+    const categories = await this.getCategories();
+    const catLookup = new Map(categories.map(c => [c.id, c]));
+
     const totalExpense = all.filter(e => e.expense_type === 'expense').reduce((s, e) => s + e.amount, 0);
     const totalIncome = all.filter(e => e.expense_type === 'income').reduce((s, e) => s + e.amount, 0);
     const catMap = new Map<string, { color: string; icon: string; total: number }>();
     all.filter(e => e.expense_type === 'expense').forEach(e => {
-      const key = e.category_name || 'Other';
-      const prev = catMap.get(key) || { color: e.category_color || '#78909C', icon: e.category_icon || 'more-horiz', total: 0 };
+      const cat = e.category_id ? catLookup.get(e.category_id) : undefined;
+      const key = (e as any).category_name || cat?.name || 'Other';
+      const color = (e as any).category_color || cat?.color || '#78909C';
+      const icon = (e as any).category_icon || cat?.icon || 'more-horiz';
+      const prev = catMap.get(key) || { color, icon, total: 0 };
       prev.total += e.amount;
       catMap.set(key, prev);
     });

@@ -49,7 +49,7 @@ export const useExpenseStore = create<ExpenseState>((set) => ({
   addExpense: async (input) => {
     try {
       const expense = await expenseRepository.insert(input);
-      set(s => ({ expenses: [expense, ...s.expenses] }));
+      set(s => ({ expenses: [expense, ...s.expenses], summary: null }));
       return expense;
     } catch (e: any) { set({ error: e.message }); throw e; }
   },
@@ -57,14 +57,14 @@ export const useExpenseStore = create<ExpenseState>((set) => ({
   updateExpense: async (id, input) => {
     try {
       const updated = await expenseRepository.update(id, input);
-      set(s => ({ expenses: s.expenses.map(e => e.id === id ? updated : e) }));
+      set(s => ({ expenses: s.expenses.map(e => e.id === id ? updated : e), summary: null }));
     } catch (e: any) { set({ error: e.message }); }
   },
 
   deleteExpense: async (id) => {
     try {
       await expenseRepository.delete(id);
-      set(s => ({ expenses: s.expenses.filter(e => e.id !== id) }));
+      set(s => ({ expenses: s.expenses.filter(e => e.id !== id), summary: null }));
     } catch (e: any) { set({ error: e.message }); }
   },
 

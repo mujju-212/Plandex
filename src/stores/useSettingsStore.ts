@@ -6,7 +6,7 @@ const SETTINGS_KEY = 'app_settings';
 
 interface SettingsState {
     notificationsEnabled: boolean;
-    toggleNotifications: () => void;
+    toggleNotifications: () => Promise<void>;
     loadSettings: () => Promise<void>;
 }
 
@@ -14,20 +14,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     notificationsEnabled: true,
 
     toggleNotifications: async () => {
-        const newVal = !get().notificationsEnabled;
+        const previous = get().notificationsEnabled;
+        const newVal = !previous;
         set({ notificationsEnabled: newVal });
 
-        // If disabling, cancel all scheduled notifications
-        if (!newVal) {
-            await cancelAllNotifications();
-        }
-
         try {
+            // If disabling, cancel all scheduled notifications
+            if (!newVal) {
+                await cancelAllNotifications();
+            }
+
             const raw = await AsyncStorage.getItem(SETTINGS_KEY);
             const settings = raw ? JSON.parse(raw) : {};
             settings.notificationsEnabled = newVal;
             await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-        } catch { }
+        } catch {
+            // Rollback on failure
+            set({ notificationsEnabled: previous });
+        }
     },
 
     loadSettings: async () => {
