@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Pressable, Alert } from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../../../src/theme/colors';
-import { typography } from '../../../src/theme/typography';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React from 'react';
+import { Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useGoalStore } from '../../../src/stores/useGoalStore';
 import { useThemeStore } from '../../../src/stores/useThemeStore';
+import { colors } from '../../../src/theme/colors';
+import { typography } from '../../../src/theme/typography';
 
 export default function GoalDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -40,7 +40,7 @@ export default function GoalDetailScreen() {
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={[styles.headerBtn, { backgroundColor: tc.cardBackground }]}><MaterialIcons name="arrow-back" size={24} color={tc.textPrimary} /></Pressable>
         <Text style={[styles.headerTitle, { color: tc.textPrimary }]}>Goal Detail</Text>
-        <View style={{ width: 40 }} />
+        <Pressable onPress={() => router.push(`/goal/edit?id=${goal.id}`)} style={[styles.headerBtn, { backgroundColor: tc.cardBackground }]}><MaterialIcons name="edit" size={22} color={tc.primary} /></Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>

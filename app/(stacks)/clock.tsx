@@ -1,4 +1,5 @@
 import { MaterialIcons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { Stack, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -16,6 +17,7 @@ import {
     TextInput,
     TouchableOpacity,
     TouchableWithoutFeedback,
+    useWindowDimensions,
     View
 } from 'react-native';
 import { useClockStore } from '../../src/stores/useClockStore';
@@ -117,12 +119,12 @@ const ScrollPicker = React.memo(({ items, selected, onChange, tc }: {
 });
 
 /* ── Flip Digit with animation ── */
-const FlipDigit = React.memo(({ value, prevValue, color, size }: { value: string; prevValue: string; color: string; size: 'normal' | 'fullscreen' }) => {
+const FlipDigit = React.memo(({ value, prevValue, color, size, overrideWidth }: { value: string; prevValue: string; color: string; size: 'normal' | 'fullscreen'; overrideWidth?: number }) => {
   const flipAnim = useRef(new Animated.Value(0)).current;
   const prevRef = useRef(prevValue);
-  const digitW = size === 'fullscreen' ? Math.min(SCREEN_H / 4, 120) : Math.min((SCREEN_W - 100) / 6, 60);
+  const digitW = overrideWidth ?? (size === 'fullscreen' ? Math.min(SCREEN_H / 4, 150) : Math.min((SCREEN_W - 80) / 6, 65));
   const digitH = digitW * 1.5;
-  const fontSize = digitW * 0.8;
+  const fontSize = digitW * 1.15;
   const bgColor = '#1A1A1A';
   const textColor = color;
 
@@ -138,13 +140,11 @@ const FlipDigit = React.memo(({ value, prevValue, color, size }: { value: string
     }
   }, [value]);
 
-  // Top half flips away (old value)
   const topFlipRotate = flipAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '-90deg'],
   });
 
-  // Bottom half flips in (new value)
   const bottomFlipRotate = flipAnim.interpolate({
     inputRange: [0, 0.5, 1],
     outputRange: ['90deg', '90deg', '0deg'],
@@ -160,16 +160,47 @@ const FlipDigit = React.memo(({ value, prevValue, color, size }: { value: string
     outputRange: [0, 0, 1],
   });
 
+  // Shared text style — no lineHeight, use includeFontPadding:false for Android
+  const digitTextStyle = {
+    fontSize,
+    color: textColor,
+    fontWeight: '800' as const,
+    fontVariant: ['tabular-nums' as const],
+    textAlign: 'center' as const,
+    includeFontPadding: false,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  };
+
+  // Top-half rendering: outer clip (height 50%) + inner full-height container centered
+  const TopHalfText = ({ char }: { char: string }) => (
+    <View style={{ width: digitW, height: digitH / 2, overflow: 'hidden' }}>
+      <View style={{ height: digitH, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={digitTextStyle}>{char}</Text>
+      </View>
+    </View>
+  );
+
+  // Bottom-half rendering: outer clip (height 50%) + inner positioned from bottom
+  const BottomHalfText = ({ char }: { char: string }) => (
+    <View style={{ width: digitW, height: digitH / 2, overflow: 'hidden' }}>
+      <View style={{ position: 'absolute', bottom: 0, width: digitW, height: digitH, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={digitTextStyle}>{char}</Text>
+      </View>
+    </View>
+  );
+
   return (
     <View style={[{ width: digitW, height: digitH, marginHorizontal: size === 'fullscreen' ? 4 : 2 }]}>
       {/* Static top - new value (revealed when flip card goes) */}
       <View style={[dStyles.halfStatic, dStyles.topHalf, { backgroundColor: bgColor, borderTopLeftRadius: digitW * 0.15, borderTopRightRadius: digitW * 0.15 }]}>
-        <Text style={[dStyles.digitText, { fontSize, lineHeight: digitH, color: textColor }]}>{value}</Text>
+        <TopHalfText char={value} />
       </View>
 
       {/* Static bottom - old value (behind flip card) */}
       <View style={[dStyles.halfStatic, dStyles.bottomHalf, { backgroundColor: bgColor, opacity: 0.92, borderBottomLeftRadius: digitW * 0.15, borderBottomRightRadius: digitW * 0.15 }]}>
-        <Text style={[dStyles.digitText, { fontSize, lineHeight: digitH, color: textColor, top: -digitH / 2 }]}>{prevValue}</Text>
+        <BottomHalfText char={prevValue} />
       </View>
 
       {/* Animated top flap (old value flipping away) */}
@@ -185,7 +216,7 @@ const FlipDigit = React.memo(({ value, prevValue, color, size }: { value: string
           backfaceVisibility: 'hidden',
         },
       ]}>
-        <Text style={[dStyles.digitText, { fontSize, lineHeight: digitH, color: textColor }]}>{prevValue}</Text>
+        <TopHalfText char={prevValue} />
       </Animated.View>
 
       {/* Animated bottom flap (new value flipping in) */}
@@ -201,7 +232,7 @@ const FlipDigit = React.memo(({ value, prevValue, color, size }: { value: string
           backfaceVisibility: 'hidden',
         },
       ]}>
-        <Text style={[dStyles.digitText, { fontSize, lineHeight: digitH, color: textColor, top: -digitH / 2 }]}>{value}</Text>
+        <BottomHalfText char={value} />
       </Animated.View>
 
       {/* Divider line */}
@@ -225,14 +256,6 @@ const dStyles = StyleSheet.create({
     bottom: 0,
     height: '50%',
   },
-  digitText: {
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
   divider: {
     position: 'absolute',
     left: 0,
@@ -244,10 +267,12 @@ const dStyles = StyleSheet.create({
 });
 
 /* ── Separator ── */
-const Sep = ({ color, size }: { color: string; size: 'normal' | 'fullscreen' }) => {
-  const dotSize = size === 'fullscreen' ? 12 : 8;
+const Sep = ({ color, size, overrideDotSize }: { color: string; size: 'normal' | 'fullscreen'; overrideDotSize?: number }) => {
+  const dotSize = overrideDotSize ?? (size === 'fullscreen' ? 12 : 8);
+  const sepW = size === 'fullscreen' ? (overrideDotSize ? overrideDotSize * 2.5 : 30) : 20;
+  const sepGap = size === 'fullscreen' ? (overrideDotSize ? overrideDotSize * 1.2 : 14) : 8;
   return (
-    <View style={[styles.sepContainer, { width: size === 'fullscreen' ? 30 : 20, gap: size === 'fullscreen' ? 14 : 8 }]}>
+    <View style={[styles.sepContainer, { width: sepW, gap: sepGap }]}>
       <View style={[styles.sepDot, { backgroundColor: color, width: dotSize, height: dotSize, borderRadius: dotSize / 2 }]} />
       <View style={[styles.sepDot, { backgroundColor: color, width: dotSize, height: dotSize, borderRadius: dotSize / 2 }]} />
     </View>
@@ -306,6 +331,11 @@ export default function ClockScreen() {
   const [alarmLabel, setAlarmLabel] = useState('');
   const [alarmDays, setAlarmDays] = useState<number[]>([]);
   const [alarmTone, setAlarmTone] = useState('default');
+  const [customToneName, setCustomToneName] = useState('');
+  const [customToneUri, setCustomToneUri] = useState('');
+
+  // Dynamic dimensions for fullscreen landscape support
+  const { width: winW, height: winH } = useWindowDimensions();
 
   const hourItems = React.useMemo(() => Array.from({ length: 24 }, (_, i) => ({ label: i.toString().padStart(2, '0'), value: i })), []);
   const minuteItems = React.useMemo(() => Array.from({ length: 60 }, (_, i) => ({ label: i.toString().padStart(2, '0'), value: i })), []);
@@ -362,14 +392,33 @@ export default function ClockScreen() {
   const addLap = () => { setLaps(prev => [swElapsed, ...prev]); };
 
   /* ── Alarms ── */
+  const handleImportCustomTone = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'audio/*',
+        copyToCacheDirectory: true,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setCustomToneName(asset.name || 'Custom Tone');
+        setCustomToneUri(asset.uri);
+        setAlarmTone('custom');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Failed to import audio file');
+    }
+  };
+
   const handleSaveAlarm = async () => {
+    const isCustom = alarmTone === 'custom' && customToneUri;
     await addAlarm({
       hour: alarmHour,
       minute: alarmMinute,
       label: alarmLabel.trim() || undefined,
       repeat_days: alarmDays,
       vibrate: true,
-      sound_name: ALARM_TONES.find(t => t.id === alarmTone)?.name || 'Default',
+      sound_name: isCustom ? customToneName : (ALARM_TONES.find(t => t.id === alarmTone)?.name || 'Default'),
+      sound_uri: isCustom ? customToneUri : undefined,
     });
     setShowAlarmModal(false);
     setAlarmLabel('');
@@ -377,6 +426,8 @@ export default function ClockScreen() {
     setAlarmMinute(0);
     setAlarmDays([]);
     setAlarmTone('default');
+    setCustomToneName('');
+    setCustomToneUri('');
   };
 
   const handleDeleteAlarm = (id: number) => {
@@ -669,21 +720,38 @@ export default function ClockScreen() {
         <TouchableWithoutFeedback onPress={handleFullscreenTap}>
           <View style={[styles.fullscreenContainer, { backgroundColor: tc.background }]}>
             <StatusBar hidden />
-            <View style={styles.fullscreenDigitRow}>
-              <FlipDigit value={digits[0]} prevValue={prevDigitsRef.current[0]} color={digitColor} size="fullscreen" />
-              <FlipDigit value={digits[1]} prevValue={prevDigitsRef.current[1]} color={digitColor} size="fullscreen" />
-              <Sep color={digitColor} size="fullscreen" />
-              <FlipDigit value={digits[2]} prevValue={prevDigitsRef.current[2]} color={digitColor} size="fullscreen" />
-              <FlipDigit value={digits[3]} prevValue={prevDigitsRef.current[3]} color={digitColor} size="fullscreen" />
-              <Sep color={digitColor} size="fullscreen" />
-              <FlipDigit value={digits[4]} prevValue={prevDigitsRef.current[4]} color={digitColor} size="fullscreen" />
-              <FlipDigit value={digits[5]} prevValue={prevDigitsRef.current[5]} color={digitColor} size="fullscreen" />
-            </View>
-            {mode === 'clock' && (
-              <Text style={[styles.fullscreenDate, { color: tc.textSecondary }]}>
-                {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-              </Text>
-            )}
+            {(() => {
+              // Calculate digit sizing based on current window dimensions
+              const isLandscape = winW > winH;
+              // Total horizontal space: 6 digits + 2 separators (~25px each) + margins
+              const sepSpace = 2 * 30;
+              const margins = 40;
+              const availW = winW - sepSpace - margins;
+              const maxDigitW = Math.floor(availW / 6);
+              // Also cap by height so digits don't overflow vertically
+              const maxByHeight = Math.floor((winH - 120) / 1.5);
+              const fsDigitW = Math.min(maxDigitW, maxByHeight, isLandscape ? 180 : 120);
+              const fsDotSize = Math.max(8, Math.floor(fsDigitW / 10));
+              return (
+                <>
+                  <View style={styles.fullscreenDigitRow}>
+                    <FlipDigit value={digits[0]} prevValue={prevDigitsRef.current[0]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
+                    <FlipDigit value={digits[1]} prevValue={prevDigitsRef.current[1]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
+                    <Sep color={digitColor} size="fullscreen" overrideDotSize={fsDotSize} />
+                    <FlipDigit value={digits[2]} prevValue={prevDigitsRef.current[2]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
+                    <FlipDigit value={digits[3]} prevValue={prevDigitsRef.current[3]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
+                    <Sep color={digitColor} size="fullscreen" overrideDotSize={fsDotSize} />
+                    <FlipDigit value={digits[4]} prevValue={prevDigitsRef.current[4]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
+                    <FlipDigit value={digits[5]} prevValue={prevDigitsRef.current[5]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
+                  </View>
+                  {mode === 'clock' && (
+                    <Text style={[styles.fullscreenDate, { color: tc.textSecondary, fontSize: isLandscape ? typography.sizes.xl : typography.sizes.lg }]}>
+                      {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </Text>
+                  )}
+                </>
+              );
+            })()}
             {showControls && (
               <TouchableOpacity style={[styles.exitFullscreenBtn, { backgroundColor: tc.cardBackground }]} onPress={toggleFullscreen}>
                 <MaterialIcons name="fullscreen-exit" size={28} color={tc.textPrimary} />
@@ -722,7 +790,7 @@ export default function ClockScreen() {
 
             {/* Alarm Tone Selector */}
             <Text style={[styles.fieldLabel, { color: tc.textSecondary }]}>Alarm Tone</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {ALARM_TONES.map(tone => (
                   <TouchableOpacity
@@ -747,6 +815,23 @@ export default function ClockScreen() {
                 ))}
               </View>
             </ScrollView>
+            {/* Custom Tone Import */}
+            <TouchableOpacity
+              style={[
+                styles.customToneBtn,
+                { borderColor: tc.border },
+                alarmTone === 'custom' && customToneUri ? { backgroundColor: tc.primary + '20', borderColor: tc.primary } : {},
+              ]}
+              onPress={handleImportCustomTone}
+            >
+              <MaterialIcons name="file-upload" size={18} color={alarmTone === 'custom' ? tc.primary : tc.textSecondary} />
+              <Text style={[styles.customToneBtnText, { color: alarmTone === 'custom' ? tc.primary : tc.textSecondary }]}>
+                {alarmTone === 'custom' && customToneName ? customToneName : 'Import Custom Tone'}
+              </Text>
+              {alarmTone === 'custom' && customToneName ? (
+                <MaterialIcons name="check-circle" size={16} color={tc.primary} />
+              ) : null}
+            </TouchableOpacity>
 
             {/* Day selector */}
             <Text style={[styles.fieldLabel, { color: tc.textSecondary }]}>Repeat</Text>
@@ -869,6 +954,12 @@ const styles = StyleSheet.create({
   timeSep: { fontSize: 32, fontWeight: '700' },
   tonePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   toneText: { fontSize: typography.sizes.xs, fontWeight: typography.weights.medium as any },
+  customToneBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14,
+    borderWidth: 1, borderStyle: 'dashed', marginBottom: 16,
+  },
+  customToneBtnText: { fontSize: typography.sizes.sm, fontWeight: typography.weights.medium as any, flex: 1 },
   input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: typography.sizes.md, marginBottom: 12 },
   fieldLabel: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any, marginBottom: 8 },
   daySelector: { flexDirection: 'row', gap: 6, marginBottom: 16 },

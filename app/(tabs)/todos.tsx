@@ -153,6 +153,7 @@ export default function TodosTab() {
               time={todo.due_time || 'No Time'}
               priorityColor={getPriorityColor(todo.priority)}
               isCompleted={todo.status === 'completed'}
+              onPress={() => router.push(`/todo/${todo.id}`)}
               onToggle={() => {
                 if (todo.status === 'completed') {
                   uncompleteTodo(todo.id);

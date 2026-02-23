@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Pressable, Alert } from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
-import { colors } from '../../../src/theme/colors';
-import { typography } from '../../../src/theme/typography';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React from 'react';
+import { Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useEventStore } from '../../../src/stores/useEventStore';
 import { useThemeStore } from '../../../src/stores/useThemeStore';
+import { colors } from '../../../src/theme/colors';
+import { typography } from '../../../src/theme/typography';
 
 export default function EventDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,7 +47,7 @@ export default function EventDetailScreen() {
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={[styles.headerBtn, { backgroundColor: tc.cardBackground }]}><MaterialIcons name="arrow-back" size={24} color={tc.textPrimary} /></Pressable>
         <Text style={[styles.headerTitle, { color: tc.textPrimary }]}>Event Detail</Text>
-        <View style={{ width: 40 }} />
+        <Pressable onPress={() => router.push(`/event/edit?id=${event.id}`)} style={[styles.headerBtn, { backgroundColor: tc.cardBackground }]}><MaterialIcons name="edit" size={22} color={tc.primary} /></Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
