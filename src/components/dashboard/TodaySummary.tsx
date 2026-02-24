@@ -1,115 +1,104 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import Card from '../common/Card';
-import ProgressRing from '../common/ProgressRing';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useThemeStore } from '../../stores/useThemeStore';
+import { typography } from '../../theme/typography';
 
 type TodaySummaryProps = {
   todosCompleted: number;
   todosTotal: number;
+  habitsCompleted: number;
+  habitsTotal: number;
   streakDays: number;
+  eventsToday: number;
+  activeGoals: number;
   productivityScore: number;
+};
+
+type StatItemData = {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  iconColor: string;
+  iconBg: string;
+  label: string;
+  value: string;
 };
 
 export default function TodaySummary({
   todosCompleted,
   todosTotal,
+  habitsCompleted,
+  habitsTotal,
   streakDays,
+  eventsToday,
+  activeGoals,
   productivityScore,
 }: TodaySummaryProps) {
   const tc = useThemeStore().colors;
-  const completionPercentage = todosTotal > 0 ? (todosCompleted / todosTotal) * 100 : 0;
+
+  const stats: StatItemData[] = [
+    { icon: 'check-circle', iconColor: tc.primary, iconBg: tc.primary + '20', label: 'Todos', value: `${todosCompleted}/${todosTotal}` },
+    { icon: 'loop', iconColor: tc.primary, iconBg: tc.primary + '20', label: 'Habits', value: `${habitsCompleted}/${habitsTotal}` },
+    { icon: 'local-fire-department', iconColor: tc.primary, iconBg: tc.primary + '20', label: 'Streak', value: `${streakDays}d` },
+    { icon: 'event-note', iconColor: tc.primary, iconBg: tc.primary + '20', label: 'Events', value: `${eventsToday}` },
+    { icon: 'flag', iconColor: tc.primary, iconBg: tc.primary + '20', label: 'Goals', value: `${activeGoals}` },
+    { icon: 'insights', iconColor: tc.primary, iconBg: tc.primary + '20', label: 'Score', value: `${productivityScore}%` },
+  ];
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.container}
-      decelerationRate="fast"
-      snapToInterval={160}
-    >
-      <Card gradient style={styles.card}>
-        <Text style={[styles.title, { color: tc.textPrimary }]}>Today's Todos</Text>
-        <View style={styles.metricContainer}>
-          <ProgressRing progress={completionPercentage / 100} radius={36} strokeWidth={8}>
-            <Text style={[styles.mainNumber, { color: tc.textPrimary }]}>{Math.round(completionPercentage)}<Text style={styles.percent}>%</Text></Text>
-          </ProgressRing>
-        </View>
-        <Text style={[styles.subtitle, { color: tc.textSecondary }]}>{todosCompleted} of {todosTotal} Completed</Text>
-      </Card>
-
-      <Card gradient style={styles.card}>
-        <Text style={[styles.title, { color: tc.textPrimary }]}>Habit Streak</Text>
-        <View style={styles.metricContainer}>
-          <MaterialIcons name="local-fire-department" size={56} color="#FF9800" />
-        </View>
-        <Text style={[styles.mainNumber, { color: tc.textPrimary }]}>{streakDays} <Text style={[styles.subtitle, { color: tc.textSecondary }]}>Days</Text></Text>
-      </Card>
-
-      <Card gradient style={styles.card}>
-        <Text style={[styles.title, { color: tc.textPrimary }]}>Productivity Score</Text>
-        <View style={styles.metricContainer}>
-          <MaterialIcons name="insights" size={50} color={tc.primaryLight} />
-        </View>
-        <View style={[styles.scorePill, { backgroundColor: tc.cardBackground }]}>
-          <Text style={[styles.scoreNumber, { color: tc.textPrimary }]}>{productivityScore}</Text>
-        </View>
-      </Card>
-    </ScrollView>
+    <View style={styles.container}>
+      <View style={styles.grid}>
+        {stats.map((stat) => (
+          <View key={stat.label} style={[styles.statCard, { backgroundColor: tc.cardBackground }]}>
+            <View style={[styles.iconCircle, { backgroundColor: stat.iconBg }]}>
+              <MaterialIcons name={stat.icon} size={18} color={stat.iconColor} />
+            </View>
+            <View style={styles.statInfo}>
+              <Text style={[styles.statValue, { color: tc.textPrimary }]}>{stat.value}</Text>
+              <Text style={[styles.statLabel, { color: tc.textSecondary }]}>{stat.label}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 8,
   },
-  card: {
-    width: 150,
-    height: 180,
-    marginHorizontal: 8,
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  statCard: {
+    width: '31%',
+    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 14,
   },
-  title: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semiBold as any,
-    textAlign: 'center',
-  },
-  metricContainer: {
-    flex: 1,
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statInfo: {
     alignItems: 'center',
   },
-  mainNumber: {
-    fontSize: typography.sizes.xxl,
-    fontWeight: typography.weights.bold as any,
-  },
-  percent: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold as any,
-  },
-  subtitle: {
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.medium as any,
-  },
-  scorePill: {
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    borderRadius: 16,
-    shadowColor: '#85C1E9',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-    position: 'absolute',
-    bottom: 20,
-  },
-  scoreNumber: {
+  statValue: {
     fontSize: typography.sizes.lg,
     fontWeight: typography.weights.bold as any,
-  }
+  },
+  statLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.medium as any,
+    marginTop: 2,
+  },
 });

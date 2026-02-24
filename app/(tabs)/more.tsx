@@ -196,6 +196,13 @@ export default function MoreTab() {
           <MenuItem icon="event" title="Events" subtitle="Manage your calendar events" onPress={() => router.push('/event')} />
           <MenuItem icon="flag" title="Goals" subtitle="View and track your goals" onPress={() => router.push('/goal')} />
           <MenuItem icon="loop" title="Habits" subtitle="View and build daily habits" onPress={() => router.push('/habit')} />
+          <MenuItem icon="note" title="Sticky Notes" subtitle="Quick colorful notes" onPress={() => router.push('/notes' as any)} />
+          <MenuItem icon="mood" title="Mood Tracker" subtitle="Track your daily mood" onPress={() => router.push('/mood' as any)} />
+          <MenuItem icon="account-balance-wallet" title="Expenses" subtitle="Track spending & income" onPress={() => router.push('/expenses' as any)} />
+          <MenuItem icon="view-column" title="Kanban Board" subtitle="Visual task workflow" onPress={() => router.push('/kanban' as any)} />
+          <MenuItem icon="folder-special" title="Planning" subtitle="Project workspace & files" onPress={() => router.push('/planning' as any)} />
+          <MenuItem icon="schedule" title="Flip Clock" subtitle="Clock, timer & stopwatch" onPress={() => router.push('/clock' as any)} />
+          <MenuItem icon="center-focus-strong" title="Focus Mode" subtitle="Pomodoro focus timer" onPress={() => router.push('/focus' as any)} />
           <MenuItem icon="date-range" title="Weekly Review" subtitle="Review your week" onPress={() => router.push('/log/weekly')} />
           <MenuItem icon="calendar-today" title="Monthly Review" subtitle="Review your month" onPress={() => router.push('/log/monthly')} />
           <MenuItem icon="bar-chart" title="Analytics" subtitle="View your productivity insights" onPress={() => router.push('/analytics')} />

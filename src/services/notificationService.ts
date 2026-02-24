@@ -279,3 +279,145 @@ function buildDateTrigger(
     return null;
   }
 }
+
+// ─── Daily Log Reminder (10:30 PM) ─────────────────────────
+
+/** Unique identifiers so we can cancel & reschedule */
+const DAILY_LOG_NOTIF_ID = 'daily-log-reminder';
+const MORNING_SCHEDULE_NOTIF_ID = 'morning-schedule';
+
+/**
+ * Schedule a daily 10:30 PM notification reminding the user to
+ * write their daily log if they haven't done so.
+ * This is a repeating daily trigger – the app-level logic should
+ * cancel & re-schedule each day after the log is completed.
+ */
+export async function scheduleDailyLogReminder(): Promise<string | null> {
+  const Notifications = getNotificationsModule();
+  if (!Notifications) return null;
+
+  try {
+    const granted = await hasNotificationPermission();
+    if (!granted) return null;
+
+    // Cancel any existing daily-log reminder first
+    try { await Notifications.cancelScheduledNotificationAsync(DAILY_LOG_NOTIF_ID); } catch {}
+
+    const id = await Notifications.scheduleNotificationAsync({
+      identifier: DAILY_LOG_NOTIF_ID,
+      content: {
+        title: '📝 Daily Log Reminder',
+        body: "You haven't written your daily log yet. Take a moment to reflect on your day!",
+        data: { type: 'daily_log_reminder' },
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: 22,
+        minute: 30,
+      },
+    });
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cancel the daily log reminder (e.g. after user completes today's log).
+ */
+export async function cancelDailyLogReminder(): Promise<void> {
+  const Notifications = getNotificationsModule();
+  if (!Notifications) return;
+  try { await Notifications.cancelScheduledNotificationAsync(DAILY_LOG_NOTIF_ID); } catch {}
+}
+
+// ─── Morning Schedule Notification (7:00 AM) ────────────────
+
+/**
+ * Schedule a daily 7:00 AM notification summarizing today's events.
+ * Call this once on app start – it repeats daily.
+ * The body text is generic; a richer version can be scheduled each
+ * evening with the next-day's specific event list via
+ * `scheduleMorningScheduleWithEvents()`.
+ */
+export async function scheduleMorningScheduleNotification(): Promise<string | null> {
+  const Notifications = getNotificationsModule();
+  if (!Notifications) return null;
+
+  try {
+    const granted = await hasNotificationPermission();
+    if (!granted) return null;
+
+    // Cancel any existing morning notification first
+    try { await Notifications.cancelScheduledNotificationAsync(MORNING_SCHEDULE_NOTIF_ID); } catch {}
+
+    const id = await Notifications.scheduleNotificationAsync({
+      identifier: MORNING_SCHEDULE_NOTIF_ID,
+      content: {
+        title: '🌅 Good Morning!',
+        body: 'Check your schedule and plan your day ahead.',
+        data: { type: 'morning_schedule' },
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: 7,
+        minute: 0,
+      },
+    });
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Schedule tomorrow morning's notification with a specific event summary.
+ * Call this in the evening (e.g. after loading tomorrow's events) for
+ * a richer notification body.
+ */
+export async function scheduleMorningScheduleWithEvents(
+  eventCount: number,
+  eventTitles: string[],
+): Promise<string | null> {
+  const Notifications = getNotificationsModule();
+  if (!Notifications) return null;
+
+  try {
+    const granted = await hasNotificationPermission();
+    if (!granted) return null;
+
+    // Cancel any existing morning notification first
+    try { await Notifications.cancelScheduledNotificationAsync(MORNING_SCHEDULE_NOTIF_ID); } catch {}
+
+    let body: string;
+    if (eventCount === 0) {
+      body = 'No events scheduled for today. Enjoy a relaxed day!';
+    } else if (eventCount === 1) {
+      body = `You have 1 event today: ${eventTitles[0]}`;
+    } else {
+      const listed = eventTitles.slice(0, 3).join(', ');
+      const more = eventCount > 3 ? ` and ${eventCount - 3} more` : '';
+      body = `You have ${eventCount} events today: ${listed}${more}`;
+    }
+
+    const id = await Notifications.scheduleNotificationAsync({
+      identifier: MORNING_SCHEDULE_NOTIF_ID,
+      content: {
+        title: '🌅 Good Morning!',
+        body,
+        data: { type: 'morning_schedule', eventCount },
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: 7,
+        minute: 0,
+      },
+    });
+    return id;
+  } catch {
+    return null;
+  }
+}

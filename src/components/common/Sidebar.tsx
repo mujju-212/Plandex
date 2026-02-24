@@ -1,13 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, ScrollView, Switch } from 'react-native';
-import { MaterialIcons, Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
-import { useThemeStore } from '../../stores/useThemeStore';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import { exportAllData, importAllData, clearAllData, downloadJSON, triggerImportDialog } from '../../utils/dataUtils';
+import { useThemeStore } from '../../stores/useThemeStore';
+import { typography } from '../../theme/typography';
+import { clearAllData, downloadJSON, exportAllData, importAllData, triggerImportDialog } from '../../utils/dataUtils';
 
 type SidebarProps = {
     visible: boolean;
@@ -73,6 +72,13 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
                         <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>FEATURES</Text>
                         <SidebarItem icon="flag" label="Goals" onPress={() => navigate('/goal/create')} tc={tc} />
                         <SidebarItem icon="loop" label="Habits" onPress={() => navigate('/habit/create')} tc={tc} />
+                        <SidebarItem icon="note" label="Sticky Notes" onPress={() => navigate('/notes')} tc={tc} />
+                        <SidebarItem icon="mood" label="Mood Tracker" onPress={() => navigate('/mood')} tc={tc} />
+                        <SidebarItem icon="account-balance-wallet" label="Expenses" onPress={() => navigate('/expenses')} tc={tc} />
+                        <SidebarItem icon="view-column" label="Kanban Board" onPress={() => navigate('/kanban')} tc={tc} />
+                        <SidebarItem icon="folder-special" label="Planning" onPress={() => navigate('/planning')} tc={tc} />
+                        <SidebarItem icon="schedule" label="Flip Clock" onPress={() => navigate('/clock')} tc={tc} />
+                        <SidebarItem icon="center-focus-strong" label="Focus Mode" onPress={() => navigate('/focus')} tc={tc} />
                         <SidebarItem icon="date-range" label="Weekly Review" onPress={() => navigate('/log/weekly')} tc={tc} />
                         <SidebarItem icon="calendar-today" label="Monthly Review" onPress={() => navigate('/log/monthly')} tc={tc} />
                         <SidebarItem icon="bar-chart" label="Analytics" onPress={() => navigate('/analytics')} tc={tc} />

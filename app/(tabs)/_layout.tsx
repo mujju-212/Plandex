@@ -1,9 +1,9 @@
-import React from 'react';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { MaterialIcons, Feather } from '@expo/vector-icons';
-import { shadows } from '../../src/theme/shadows';
+import React from 'react';
 import { Platform } from 'react-native';
 import { useThemeStore } from '../../src/stores/useThemeStore';
+import { shadows } from '../../src/theme/shadows';
 
 export default function TabLayout() {
   const { colors } = useThemeStore();
@@ -14,6 +14,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
+        sceneStyle: { backgroundColor: colors.background },
         tabBarStyle: {
           backgroundColor: colors.cardBackground,
           borderTopWidth: 1,
@@ -23,6 +24,7 @@ export default function TabLayout() {
           paddingTop: 8,
           ...shadows.lg,
         },
+        animation: 'shift',
       }}
     >
       <Tabs.Screen

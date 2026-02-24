@@ -5,9 +5,20 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import FAB from '../../src/components/common/FAB';
 import Sidebar from '../../src/components/common/Sidebar';
+import ActiveGoals from '../../src/components/dashboard/ActiveGoals';
+import DailyLogPrompt from '../../src/components/dashboard/DailyLogPrompt';
 import GreetingHeader from '../../src/components/dashboard/GreetingHeader';
+import QuickActions from '../../src/components/dashboard/QuickActions';
+import TodayHabits from '../../src/components/dashboard/TodayHabits';
 import TodaySummary from '../../src/components/dashboard/TodaySummary';
+import UpcomingEvents from '../../src/components/dashboard/UpcomingEvents';
 import TodoItem from '../../src/components/todo/TodoItem';
+import { cancelDailyLogReminder, scheduleDailyLogReminder } from '../../src/services/notificationService';
+import { useEventStore } from '../../src/stores/useEventStore';
+import { useGamificationStore } from '../../src/stores/useGamificationStore';
+import { useGoalStore } from '../../src/stores/useGoalStore';
+import { useHabitStore } from '../../src/stores/useHabitStore';
+import { useLogStore } from '../../src/stores/useLogStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { useTodoStore } from '../../src/stores/useTodoStore';
 import { colors } from '../../src/theme/colors';
@@ -21,20 +32,75 @@ export default function HomeTab() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [userName, setUserName] = useState('User');
 
+  // Stores
   const { todos, loadTodos, completeTodo, uncompleteTodo } = useTodoStore();
+  const { habits, todayCompletions, loadHabits, loadTodayCompletions, toggleCompletion } = useHabitStore();
+  const { events, loadEvents } = useEventStore();
+  const { goals, loadGoals } = useGoalStore();
+  const { logs, loadRecentLogs } = useLogStore();
+  const { totalXP, currentLevel, levelTitle, currentStreak, loadStats } = useGamificationStore();
 
+  // Load all data on mount
   useEffect(() => {
     loadTodos();
-  }, [loadTodos]);
+    loadHabits();
+    loadTodayCompletions();
+    loadEvents();
+    loadGoals();
+    loadRecentLogs(7);
+    loadStats();
+  }, []);
 
-  // Reload user name every time screen gains focus (e.g. after profile edit)
+  // Reload on focus
   useFocusEffect(
     useCallback(() => {
       AsyncStorage.getItem('profile_name').then(name => {
         if (name) setUserName(name);
       });
+      loadTodos();
+      loadHabits();
+      loadTodayCompletions();
+      loadEvents();
+      loadGoals();
+      loadRecentLogs(7);
+      loadStats();
     }, [])
   );
+
+  // Computed values
+  const today = new Date().toISOString().split('T')[0];
+  const pendingTodos = todos.filter(t => t.status !== 'completed');
+  const pendingCount = pendingTodos.length;
+  const completedCount = todos.length - pendingCount;
+  const todaysTodos = todos.slice(0, 5); // Show up to 5 on dashboard
+
+  const activeHabits = habits.filter(h => h.is_active);
+  const todayCompletedHabitIds = new Set(todayCompletions.filter(c => c.date === today).map(c => c.habit_id));
+  const habitsCompletedCount = activeHabits.filter(h => todayCompletedHabitIds.has(h.id)).length;
+
+  const todayEvents = events.filter(e => {
+    try { return e.start_datetime.startsWith(today) && e.status !== 'cancelled'; }
+    catch { return false; }
+  });
+
+  const activeGoals = goals.filter(g => g.status === 'in_progress' || g.status === 'not_started');
+
+  const hasLoggedToday = logs.some(l => {
+    if (l.date !== today) return false;
+    // Only count as "done" if user actually wrote something
+    return !!(l.what_i_did || l.achievements || l.learnings || l.challenges || l.tomorrow_intention || l.gratitude || l.overall_rating);
+  });
+
+  // Cancel or reschedule the 10:30 PM daily-log reminder based on whether user logged today
+  useEffect(() => {
+    if (hasLoggedToday) {
+      cancelDailyLogReminder();
+    } else {
+      scheduleDailyLogReminder();
+    }
+  }, [hasLoggedToday]);
+
+  const productivityScore = todos.length > 0 ? Math.round((completedCount / todos.length) * 100) : 0;
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -55,38 +121,82 @@ export default function HomeTab() {
     return 'default';
   };
 
-  const pendingTodos = todos.filter(t => t.status !== 'completed');
-  const pendingCount = pendingTodos.length;
-  const completedCount = todos.length - pendingCount;
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tc.background }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Greeting with level & XP */}
         <GreetingHeader
           name={userName}
           unreadCount={pendingCount}
+          level={currentLevel}
+          levelTitle={levelTitle}
+          totalXP={totalXP}
           onMenuPress={() => setShowSidebar(true)}
           onSearchPress={() => router.push('/search')}
           onNotificationPress={() => setShowNotifications(true)}
         />
 
+        {/* Stats Summary Cards (horizontal scroll) */}
         <TodaySummary
           todosCompleted={completedCount}
           todosTotal={todos.length}
-          streakDays={1}
-          productivityScore={todos.length > 0 ? Math.round((completedCount / todos.length) * 100) : 0}
+          habitsCompleted={habitsCompletedCount}
+          habitsTotal={activeHabits.length}
+          streakDays={currentStreak}
+          eventsToday={todayEvents.length}
+          activeGoals={activeGoals.length}
+          productivityScore={productivityScore}
         />
 
+        {/* Quick Create Buttons */}
+        <QuickActions
+          onCreateEvent={() => router.push('/event/create')}
+          onCreateLog={() => router.push(`/log/daily/${today}`)}
+          onCreateHabit={() => router.push('/habit/create')}
+          onCreateGoal={() => router.push('/goal/create')}
+        />
+
+        {/* Daily Log Prompt */}
+        <DailyLogPrompt
+          hasLoggedToday={hasLoggedToday}
+          currentStreak={currentStreak}
+          onPress={() => router.push(`/log/daily/${today}`)}
+        />
+
+        {/* Upcoming Events */}
+        <UpcomingEvents
+          events={events}
+          onEventPress={(id) => router.push(`/event/${id}`)}
+          onViewAll={() => router.push('/(tabs)/calendar')}
+        />
+
+        {/* Today's Todos */}
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: tc.textPrimary }]}>Today's Todos</Text>
-          <View style={[styles.sectionDivider, { backgroundColor: tc.border }]} />
+          <View style={styles.sectionLeft}>
+            <MaterialIcons name="check-box" size={20} color={tc.primary} />
+            <Text style={[styles.sectionTitle, { color: tc.textPrimary }]}>Today's Todos</Text>
+            {pendingCount > 0 && (
+              <View style={[styles.todoBadge, { backgroundColor: tc.danger + '20' }]}>
+                <Text style={[styles.todoBadgeText, { color: tc.danger }]}>{pendingCount}</Text>
+              </View>
+            )}
+          </View>
+          <Pressable onPress={() => router.push('/(tabs)/todos')} hitSlop={8}>
+            <Text style={[styles.viewAllLink, { color: tc.primary }]}>View All</Text>
+          </Pressable>
         </View>
 
         {todos.length === 0 ? (
-          <Text style={{ marginHorizontal: 20, marginTop: 16, color: tc.textSecondary }}>No tasks yet. Create one!</Text>
+          <View style={[styles.emptyState, { backgroundColor: tc.cardBackground }]}>
+            <MaterialIcons name="task-alt" size={40} color={tc.border} />
+            <Text style={[styles.emptyTitle, { color: tc.textSecondary }]}>No tasks yet</Text>
+            <Pressable onPress={() => router.push('/todo/create')} style={[styles.emptyBtn, { backgroundColor: tc.primary }]}>
+              <Text style={styles.emptyBtnText}>Create your first todo</Text>
+            </Pressable>
+          </View>
         ) : (
-          todos.map((todo) => (
+          todaysTodos.map((todo) => (
             <TodoItem
               key={todo.id}
               title={todo.title}
@@ -105,6 +215,28 @@ export default function HomeTab() {
             />
           ))
         )}
+
+        {todos.length > 5 && (
+          <Pressable onPress={() => router.push('/(tabs)/todos')} style={[styles.showMoreBtn, { backgroundColor: tc.primary + '10' }]}>
+            <Text style={[styles.showMoreText, { color: tc.primary }]}>Show all {todos.length} todos</Text>
+            <MaterialIcons name="arrow-forward" size={16} color={tc.primary} />
+          </Pressable>
+        )}
+
+        {/* Today's Habits */}
+        <TodayHabits
+          habits={habits}
+          completions={todayCompletions}
+          onToggle={(habitId, date) => toggleCompletion(habitId, date)}
+          onViewAll={() => router.push('/habit')}
+        />
+
+        {/* Active Goals */}
+        <ActiveGoals
+          goals={goals}
+          onGoalPress={(id) => router.push(`/goal/${id}`)}
+          onViewAll={() => router.push('/goal')}
+        />
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -218,9 +350,18 @@ export default function HomeTab() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scrollContent: { paddingBottom: 20 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 24, marginBottom: 8 },
-  sectionTitle: { fontSize: typography.sizes.xl, fontWeight: typography.weights.bold as any, color: colors.textPrimary, marginRight: 16 },
-  sectionDivider: { flex: 1, height: 1, backgroundColor: colors.border },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 20, marginTop: 20, marginBottom: 8 },
+  sectionLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any, color: colors.textPrimary },
+  todoBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  todoBadgeText: { fontSize: 11, fontWeight: typography.weights.bold as any },
+  viewAllLink: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any },
+  emptyState: { marginHorizontal: 20, padding: 28, borderRadius: 16, alignItems: 'center' as const, gap: 10, marginTop: 4 },
+  emptyTitle: { fontSize: typography.sizes.md, fontWeight: typography.weights.medium as any },
+  emptyBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, marginTop: 4 },
+  emptyBtnText: { color: '#FFF', fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any },
+  showMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginHorizontal: 20, marginTop: 8, padding: 12, borderRadius: 12, gap: 6 },
+  showMoreText: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' as const, alignItems: 'center' as const, padding: 32 },
 
   // Notification panel styles

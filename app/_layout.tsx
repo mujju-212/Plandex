@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { colors } from '../src/theme/colors';
+import React, { useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
 import { initializeDatabase } from '../src/database/schema';
+import { useNotifications } from '../src/hooks/useNotifications';
 import { useThemeStore } from '../src/stores/useThemeStore';
 
 export default function RootLayout() {
   const [dbInitialized, setDbInitialized] = useState(false);
   const { isDark, colors: themeColors, loadTheme } = useThemeStore();
+
+  // Schedule daily notifications (7 AM morning schedule + 10:30 PM log reminder)
+  useNotifications();
 
   useEffect(() => {
     async function setup() {
@@ -38,6 +41,8 @@ export default function RootLayout() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: themeColors.background },
+          animation: 'fade',
+          animationDuration: 200,
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
