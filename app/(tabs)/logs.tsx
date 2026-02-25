@@ -103,23 +103,25 @@ export default function DailyLogScreen() {
       
       {/* Header with date navigation and menu */}
       <View style={styles.header}>
-        <Pressable 
-          style={[styles.menuBtn, { backgroundColor: tc.cardBackground }]} 
-          onPress={() => setShowSidebar(true)}
-        >
-          <MaterialIcons name="menu" size={24} color={tc.textPrimary} />
-        </Pressable>
-        <View style={[styles.dateSelector, { backgroundColor: tc.cardBackground }]}>
-          <Pressable style={styles.arrow} onPress={goToPreviousDay}>
-            <MaterialIcons name="chevron-left" size={28} color={tc.textSecondary} />
+        <View style={styles.headerTop}>
+          <Pressable 
+            style={[styles.menuBtn, { backgroundColor: tc.cardBackground }]} 
+            onPress={() => setShowSidebar(true)}
+          >
+            <MaterialIcons name="menu" size={24} color={tc.textPrimary} />
           </Pressable>
-          <View style={styles.dateInfo}>
-            {isToday && <Text style={[styles.todayLabel, { color: tc.primary }]}>Today</Text>}
-            <Text style={[styles.dateText, { color: tc.textPrimary }]}>{todayStr}</Text>
+          <View style={[styles.dateSelector, { backgroundColor: tc.cardBackground }]}>
+            <Pressable style={styles.arrow} onPress={goToPreviousDay}>
+              <MaterialIcons name="chevron-left" size={24} color={tc.textSecondary} />
+            </Pressable>
+            <View style={styles.dateInfo}>
+              {isToday && <Text style={[styles.todayLabel, { color: tc.primary }]}>Today</Text>}
+              <Text style={[styles.dateText, { color: tc.textPrimary }]} numberOfLines={1}>{todayStr}</Text>
+            </View>
+            <Pressable style={styles.arrow} onPress={goToNextDay}>
+              <MaterialIcons name="chevron-right" size={24} color={tc.textSecondary} />
+            </Pressable>
           </View>
-          <Pressable style={styles.arrow} onPress={goToNextDay}>
-            <MaterialIcons name="chevron-right" size={28} color={tc.textSecondary} />
-          </Pressable>
         </View>
 
         {/* Tabs: Write / History */}
@@ -143,7 +145,7 @@ export default function DailyLogScreen() {
         {/* Quick links */}
         <View style={styles.reviewNav}>
           <Pressable style={[styles.reviewBtn, { backgroundColor: tc.cardBackground }]} onPress={() => router.push('/log/weekly')}>
-            <MaterialIcons name="date-range" size={16} color={tc.primary} />
+            <MaterialIcons name="calendar-view-week" size={16} color={tc.primary} />
             <Text style={[styles.reviewBtnText, { color: tc.textPrimary }]}>Weekly</Text>
           </Pressable>
           <Pressable style={[styles.reviewBtn, { backgroundColor: tc.cardBackground }]} onPress={() => router.push('/log/monthly')}>
@@ -325,20 +327,21 @@ export default function DailyLogScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: 20, paddingTop: 40, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  header: { paddingHorizontal: 16, paddingTop: 30, paddingBottom: 8 },
+  headerTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   menuBtn: { padding: 8, borderRadius: 12 },
-  dateSelector: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 8, borderRadius: 16, marginBottom: 10 },
-  dateInfo: { alignItems: 'center' as const },
+  dateSelector: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14 },
+  dateInfo: { alignItems: 'center' as const, flex: 1 },
   todayLabel: { fontSize: typography.sizes.xs, fontWeight: typography.weights.bold as any, marginBottom: 2 },
-  dateText: { fontSize: typography.sizes.md, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary },
-  arrow: { padding: 8 },
-  tabsRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  dateText: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary, textAlign: 'center' },
+  arrow: { padding: 4 },
+  tabsRow: { flexDirection: 'row', gap: 8, marginBottom: 10, marginHorizontal: 20 },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, backgroundColor: colors.cardBackground },
   tabText: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any },
-  reviewNav: { flexDirection: 'row', gap: 10 },
+  reviewNav: { flexDirection: 'row', gap: 10, marginHorizontal: 20, marginBottom: 8 },
   reviewBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12 },
   reviewBtnText: { fontSize: typography.sizes.sm, fontWeight: typography.weights.medium as any },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 120 },
   sectionLabel: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any, textTransform: 'uppercase' as const, letterSpacing: 1, marginTop: 20, marginBottom: 10 },
   moodRow: { flexDirection: 'row', gap: 8 },
   moodItem: { flex: 1, alignItems: 'center' as const, paddingVertical: 12, borderRadius: 14, borderWidth: 2, borderColor: 'transparent' },
@@ -350,7 +353,7 @@ const styles = StyleSheet.create({
   starsRow: { flexDirection: 'row', gap: 2 },
   starBtn: { padding: 2 },
   ratingText: { marginTop: 8, fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any },
-  bottomContainer: { position: 'absolute' as const, bottom: 32, left: 20, right: 20 },
+  bottomContainer: { position: 'absolute' as const, bottom: 20, left: 20, right: 20 },
   mainSaveBtn: { shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
   mainSaveGradient: { paddingVertical: 16, borderRadius: 30, alignItems: 'center' as const, flexDirection: 'row', justifyContent: 'center' as const, gap: 8 },
   mainSaveText: { color: '#FFF', fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any },

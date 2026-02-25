@@ -1,14 +1,14 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, RefreshControl, TextInput, Pressable } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import TodoItem from '../../src/components/todo/TodoItem';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import FAB from '../../src/components/common/FAB';
 import Sidebar from '../../src/components/common/Sidebar';
+import TodoItem from '../../src/components/todo/TodoItem';
+import { useThemeStore } from '../../src/stores/useThemeStore';
+import { useTodoStore } from '../../src/stores/useTodoStore';
 import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/typography';
-import { useTodoStore } from '../../src/stores/useTodoStore';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useThemeStore } from '../../src/stores/useThemeStore';
 
 type FilterStatus = 'all' | 'pending' | 'completed' | 'archived';
 
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 30,
     paddingBottom: 8,
   },
   headerTitle: {

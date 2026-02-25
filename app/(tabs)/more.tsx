@@ -1,9 +1,12 @@
 import { Feather, MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import Sidebar from '../../src/components/common/Sidebar';
+import { useGamificationStore } from '../../src/stores/useGamificationStore';
 import { useSettingsStore } from '../../src/stores/useSettingsStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { colors } from '../../src/theme/colors';
@@ -42,9 +45,23 @@ export default function MoreTab() {
   const router = useRouter();
   const { isDark, toggleTheme, loadTheme, colors: themeColors } = useThemeStore();
   const { notificationsEnabled, toggleNotifications, loadSettings } = useSettingsStore();
+  const { totalXP, currentLevel, levelTitle, currentStreak, todosCompleted, loadStats } = useGamificationStore();
   const [showSidebar, setShowSidebar] = React.useState(false);
+  const [profileName, setProfileName] = useState('M');
+  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
 
-  useEffect(() => { loadTheme(); loadSettings(); }, []);
+  useEffect(() => {
+    loadTheme();
+    loadSettings();
+    loadStats();
+  }, []);
+
+  const loadProfileData = useCallback(() => {
+    AsyncStorage.getItem('profile_name').then(v => setProfileName(v || 'M'));
+    AsyncStorage.getItem('profile_photo_uri').then(v => setProfilePhoto(v));
+  }, []);
+
+  useFocusEffect(loadProfileData);
 
   const handleExport = async () => {
     try {
@@ -91,35 +108,40 @@ export default function MoreTab() {
         
         {/* Profile Card */}
         <LinearGradient
-          colors={[colors.gradientStart, colors.gradientEnd]}
+          colors={[themeColors.gradientStart, themeColors.gradientEnd] as any}
           style={styles.profileCard}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>M</Text>
+            {profilePhoto
+              ? <Image source={{ uri: profilePhoto }} style={styles.avatarImage} contentFit="cover" />
+              : <Text style={styles.avatarText}>{profileName.charAt(0).toUpperCase()}</Text>
+            }
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Mujju</Text>
-            <Text style={styles.profileLevel}>Level 1 • Beginner</Text>
+            <Text style={styles.profileName}>{profileName}</Text>
+            <Text style={styles.profileLevel}>Level {currentLevel} • {levelTitle}</Text>
           </View>
-          <MaterialIcons name="edit" size={20} color="rgba(255,255,255,0.7)" />
+          <TouchableOpacity onPress={() => router.push('/profile')}>
+            <MaterialIcons name="edit" size={20} color="rgba(255,255,255,0.7)" />
+          </TouchableOpacity>
         </LinearGradient>
 
         {/* Stats Row */}
         <View style={[styles.statsRow, { backgroundColor: themeColors.cardBackground }]}>
           <View style={styles.statBlock}>
-            <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>0</Text>
+            <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>{totalXP}</Text>
             <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>XP</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBlock}>
-            <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>0</Text>
+            <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>{currentStreak}</Text>
             <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Streak</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBlock}>
-            <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>0</Text>
+            <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>{todosCompleted}</Text>
             <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Done</Text>
           </View>
         </View>
@@ -127,8 +149,9 @@ export default function MoreTab() {
         {/* Features Section */}
         <Text style={[styles.sectionLabel, { color: themeColors.textSecondary }]}>Features</Text>
         <View style={[styles.menuGroup, { backgroundColor: themeColors.cardBackground }]}>
-          <MenuItem icon="flag" title="Goals" subtitle="Set and track your goals" onPress={() => router.push('/goal/create')} />
-          <MenuItem icon="loop" title="Habits" subtitle="Build daily habits" onPress={() => router.push('/habit/create')} />
+          <MenuItem icon="event" title="Events" subtitle="Manage your calendar events" onPress={() => router.push('/event')} />
+          <MenuItem icon="flag" title="Goals" subtitle="View and track your goals" onPress={() => router.push('/goal')} />
+          <MenuItem icon="loop" title="Habits" subtitle="View and build daily habits" onPress={() => router.push('/habit')} />
           <MenuItem icon="date-range" title="Weekly Review" subtitle="Review your week" onPress={() => router.push('/log/weekly')} />
           <MenuItem icon="calendar-today" title="Monthly Review" subtitle="Review your month" onPress={() => router.push('/log/monthly')} />
           <MenuItem icon="bar-chart" title="Analytics" subtitle="View your productivity insights" onPress={() => router.push('/analytics')} />
@@ -199,7 +222,7 @@ const styles = StyleSheet.create({
   },
   topBar: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 30,
     paddingBottom: 8,
     flexDirection: 'row',
     justifyContent: 'flex-start',
@@ -225,6 +248,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   avatarText: {
     fontSize: 22,

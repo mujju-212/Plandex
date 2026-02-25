@@ -1,18 +1,29 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Pressable } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../../src/theme/colors';
-import { typography } from '../../src/theme/typography';
-import { useTodoStore } from '../../src/stores/useTodoStore';
+import { Stack, useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useGoalStore } from '../../src/stores/useGoalStore';
+import { useHabitStore } from '../../src/stores/useHabitStore';
 import { useLogStore } from '../../src/stores/useLogStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
+import { useTodoStore } from '../../src/stores/useTodoStore';
+import { colors } from '../../src/theme/colors';
+import { typography } from '../../src/theme/typography';
 
 export default function AnalyticsScreen() {
   const router = useRouter();
   const tc = useThemeStore().colors;
-  const { todos } = useTodoStore();
-  const { logs } = useLogStore();
+  const { todos, loadTodos } = useTodoStore();
+  const { logs, loadLogs } = useLogStore();
+  const { habits, loadHabits } = useHabitStore();
+  const { goals, loadGoals } = useGoalStore();
+
+  useEffect(() => {
+    loadTodos();
+    loadLogs();
+    loadHabits();
+    loadGoals();
+  }, []);
 
   const totalTodos = todos.length;
   const completedTodos = todos.filter(t => t.status === 'completed').length;
@@ -23,13 +34,22 @@ export default function AnalyticsScreen() {
     ? (logs.reduce((sum, l) => sum + (l.overall_rating || 0), 0) / logs.length).toFixed(1)
     : '—';
 
+  const activeHabits = habits.filter(h => h.is_active).length;
+  const bestHabitStreak = habits.reduce((max, h) => Math.max(max, h.current_streak ?? 0), 0);
+  const activeGoals = goals.filter(g => g.status === 'in_progress' || g.status === 'not_started').length;
+  const achievedGoals = goals.filter(g => g.status === 'achieved').length;
+
   const stats = [
     { label: 'Total Tasks', value: totalTodos.toString(), icon: 'assignment', color: tc.primary },
     { label: 'Completed', value: completedTodos.toString(), icon: 'check-circle', color: tc.success },
     { label: 'Pending', value: pendingTodos.toString(), icon: 'pending', color: tc.warning },
-    { label: 'Completion Rate', value: `${completionRate}%`, icon: 'trending-up', color: tc.primary },
+    { label: 'Completion %', value: `${completionRate}%`, icon: 'trending-up', color: tc.primary },
     { label: 'Daily Logs', value: totalLogs.toString(), icon: 'insert-drive-file', color: tc.primary },
     { label: 'Avg Rating', value: avgOverall, icon: 'star', color: tc.warning },
+    { label: 'Active Habits', value: activeHabits.toString(), icon: 'repeat', color: tc.success },
+    { label: 'Best Streak', value: `${bestHabitStreak}d`, icon: 'local-fire-department', color: '#FF5722' },
+    { label: 'Active Goals', value: activeGoals.toString(), icon: 'flag', color: tc.primary },
+    { label: 'Goals Done', value: achievedGoals.toString(), icon: 'emoji-events', color: '#FFD700' },
   ];
 
   return (
@@ -54,8 +74,8 @@ export default function AnalyticsScreen() {
           ))}
         </View>
 
-        {/* Priority Breakdown */}
-        <Text style={[styles.sectionTitle, { color: tc.textPrimary }]}>Priority Breakdown</Text>
+        {/* Todo Priority Breakdown */}
+        <Text style={[styles.sectionTitle, { color: tc.textPrimary }]}>Task Priority Breakdown</Text>
         <View style={[styles.breakdownCard, { backgroundColor: tc.cardBackground }]}>
           {['urgent', 'high', 'medium', 'low'].map(p => {
             const count = todos.filter(t => t.priority === p).length;
@@ -70,6 +90,53 @@ export default function AnalyticsScreen() {
             );
           })}
         </View>
+
+        {/* Log Ratings Breakdown */}
+        {logs.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { color: tc.textPrimary }]}>Log Ratings Breakdown</Text>
+            <View style={[styles.breakdownCard, { backgroundColor: tc.cardBackground }]}>
+              {[
+                { label: 'Productivity', key: 'productivity_rating' },
+                { label: 'Satisfaction', key: 'satisfaction_rating' },
+                { label: 'Energy', key: 'energy_rating' },
+                { label: 'Overall', key: 'overall_rating' },
+              ].map(({ label, key }) => {
+                const avg = logs.reduce((s, l) => s + ((l as any)[key] || 0), 0) / logs.length;
+                const pct = Math.round((avg / 10) * 100);
+                return (
+                  <View key={key} style={styles.breakdownRow}>
+                    <Text style={[styles.breakdownLabel, { color: tc.textSecondary }]}>{label}</Text>
+                    <View style={[styles.breakdownBar, { backgroundColor: tc.border }]}><View style={[styles.breakdownFill, { width: `${pct}%`, backgroundColor: tc.primary }]} /></View>
+                    <Text style={[styles.breakdownValue, { color: tc.textPrimary }]}>{avg.toFixed(1)}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {/* Goals Breakdown */}
+        {goals.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { color: tc.textPrimary }]}>Goals Overview</Text>
+            <View style={[styles.breakdownCard, { backgroundColor: tc.cardBackground }]}>
+              {(['in_progress', 'achieved', 'not_started', 'failed'] as const).map(s => {
+                const count = goals.filter(g => g.status === s).length;
+                const pct = goals.length > 0 ? Math.round((count / goals.length) * 100) : 0;
+                const barColor = s === 'achieved' ? tc.success : s === 'in_progress' ? tc.primary : s === 'failed' ? tc.danger : tc.textSecondary;
+                const label = s === 'in_progress' ? 'Active' : s === 'not_started' ? 'Not Started' : s.charAt(0).toUpperCase() + s.slice(1);
+                return (
+                  <View key={s} style={styles.breakdownRow}>
+                    <Text style={[styles.breakdownLabel, { color: tc.textSecondary }]}>{label}</Text>
+                    <View style={[styles.breakdownBar, { backgroundColor: tc.border }]}><View style={[styles.breakdownFill, { width: `${pct}%`, backgroundColor: barColor }]} /></View>
+                    <Text style={[styles.breakdownValue, { color: tc.textPrimary }]}>{count}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

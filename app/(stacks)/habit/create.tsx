@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, Pressable, Alert } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Stack, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Card from '../../../src/components/common/Card';
+import { useHabitStore } from '../../../src/stores/useHabitStore';
+import { useThemeStore } from '../../../src/stores/useThemeStore';
 import { colors } from '../../../src/theme/colors';
 import { typography } from '../../../src/theme/typography';
-import { useHabitStore } from '../../../src/stores/useHabitStore';
 import { HabitCategory, HabitFrequency, HabitTimeOfDay } from '../../../src/types/habit.types';
-import { useThemeStore } from '../../../src/stores/useThemeStore';
 
 const CATEGORIES: { label: string; value: HabitCategory; icon: string; color: string }[] = [
   { label: 'Health', value: 'health', icon: 'favorite', color: '#E91E63' },
@@ -36,6 +37,19 @@ export default function CreateHabitScreen() {
   const [timesPerWeek, setTimesPerWeek] = useState('3');
   const [timeOfDay, setTimeOfDay] = useState<HabitTimeOfDay>('anytime');
   const [reminderTime, setReminderTime] = useState('');
+
+  // Time picker state
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
+
+  const handleTimeChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') setShowTimePicker(false);
+    if (selectedDate) {
+      const hours = selectedDate.getHours().toString().padStart(2, '0');
+      const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
+      setReminderTime(`${hours}:${minutes}`);
+    }
+  };
 
   const toggleDay = (day: number) => {
     setSpecificDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
@@ -117,25 +131,38 @@ export default function CreateHabitScreen() {
         )}
 
         <Text style={[styles.label, { color: tc.textSecondary }]}>Time of Day</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
           {([['morning', '🌅 Morning'], ['afternoon', '☀️ Afternoon'], ['evening', '🌙 Evening'], ['anytime', '⏰ Anytime']] as const).map(([v, l]) => (
             <Pressable key={v} style={[styles.chip, { backgroundColor: tc.cardBackground, borderColor: tc.border }, timeOfDay === v && { backgroundColor: tc.primary, borderColor: tc.primary }]} onPress={() => setTimeOfDay(v)}>
               <Text style={[styles.chipText, { color: tc.textSecondary }, timeOfDay === v && { color: '#FFF' }]}>{l}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
 
         <Text style={[styles.label, { color: tc.textSecondary }]}>Reminder</Text>
         <Card style={styles.card}>
           <View style={styles.fieldRow}>
             <MaterialIcons name="notifications" size={20} color={tc.warning} />
             <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Time</Text>
-            <TextInput style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]} value={reminderTime} onChangeText={setReminderTime} placeholder="HH:MM (optional)" placeholderTextColor={tc.textSecondary} />
+            {Platform.OS === 'web' ? (
+              <input type="time" value={reminderTime} onChange={(e: any) => setReminderTime(e.target.value)} style={{ flex: 1, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'right', outline: 'none', fontFamily: 'inherit' } as any} placeholder="Optional" />
+            ) : (
+              <Pressable onPress={() => { if (reminderTime) { const [h, m] = reminderTime.split(':'); const d = new Date(); d.setHours(parseInt(h), parseInt(m)); setTempDate(d); } else { setTempDate(new Date()); } setShowTimePicker(true); }} style={{ flex: 1 }}>
+                <Text style={[styles.fieldInput, { color: reminderTime ? tc.textPrimary : tc.textSecondary, backgroundColor: tc.background }]}>
+                  {reminderTime || 'Optional'}
+                </Text>
+              </Pressable>
+            )}
           </View>
         </Card>
 
         <View style={{ height: 120 }} />
       </ScrollView>
+
+      {/* Time Picker for Mobile */}
+      {Platform.OS !== 'web' && showTimePicker && (
+        <DateTimePicker value={tempDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={handleTimeChange} />
+      )}
 
       <View style={styles.bottomBar}>
         <Pressable onPress={handleSave}>

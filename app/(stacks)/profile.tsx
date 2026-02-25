@@ -1,17 +1,73 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TextInput, Pressable, Alert } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Stack, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Alert, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useGamificationStore } from '../../src/stores/useGamificationStore';
+import { useThemeStore } from '../../src/stores/useThemeStore';
 import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/typography';
-import { useThemeStore } from '../../src/stores/useThemeStore';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const tc = useThemeStore().colors;
   const [name, setName] = useState('Mujju');
   const [profession, setProfession] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+
+  const { 
+    totalXP, 
+    currentLevel, 
+    levelTitle, 
+    currentStreak, 
+    todosCompleted, 
+    badges,
+    loadStats,
+  } = useGamificationStore();
+
+  // XP progress calculation using LEVELS thresholds
+  const LEVEL_THRESHOLDS = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5500, 7500];
+  const curMin = LEVEL_THRESHOLDS[currentLevel - 1] ?? 0;
+  const nextMin = LEVEL_THRESHOLDS[currentLevel] ?? null;
+  const xpIntoLevel = totalXP - curMin;
+  const xpForNext = nextMin !== null ? nextMin - curMin : 1;
+  const progressToNextLevel = nextMin !== null ? Math.min(100, Math.round((xpIntoLevel / xpForNext) * 100)) : 100;
+
+  useEffect(() => {
+    loadStats();
+    AsyncStorage.getItem('profile_name').then(v => { if (v) setName(v); });
+    AsyncStorage.getItem('profile_profession').then(v => { if (v) setProfession(v); });
+    AsyncStorage.getItem('profile_photo_uri').then(v => { if (v) setPhotoUri(v); });
+  }, []);
+
+  const pickImage = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission required', 'Please allow access to your photo library.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const uri = result.assets[0].uri;
+      setPhotoUri(uri);
+      await AsyncStorage.setItem('profile_photo_uri', uri);
+    }
+  };
+
+  const saveProfile = async () => {
+    await AsyncStorage.setItem('profile_name', name.trim() || 'User');
+    await AsyncStorage.setItem('profile_profession', profession);
+    Alert.alert('Saved', 'Profile updated!');
+    router.back();
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tc.background }]}>
@@ -24,25 +80,137 @@ export default function ProfileScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.avatarSection}>
-          <LinearGradient colors={[tc.gradientStart, tc.gradientEnd]} style={styles.avatar}>
-            <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+          <LinearGradient colors={[tc.gradientStart, tc.gradientEnd] as any} style={styles.avatar}>
+            {photoUri
+              ? <Image source={{ uri: photoUri }} style={styles.avatarPhoto} contentFit="cover" />
+              : <Text style={styles.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+            }
           </LinearGradient>
-          <Pressable style={[styles.editAvatarBtn, { backgroundColor: tc.primary, borderColor: tc.background }]}><MaterialIcons name="camera-alt" size={16} color="#FFF" /></Pressable>
+          <Pressable style={[styles.editAvatarBtn, { backgroundColor: tc.primary, borderColor: tc.background }]} onPress={pickImage}>
+            <MaterialIcons name="camera-alt" size={16} color="#FFF" />
+          </Pressable>
         </View>
 
-        <Text style={[styles.label, { color: tc.textSecondary }]}>Name</Text>
-        <TextInput style={[styles.input, { backgroundColor: tc.cardBackground, color: tc.textPrimary, borderColor: tc.border }]} value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor={tc.textSecondary} />
+        {/* Gamification Stats Section */}
+        <View style={[styles.gamificationCard, { backgroundColor: tc.cardBackground }]}>
+          {/* Level & XP */}
+          <View style={styles.levelSection}>
+            <View style={styles.levelHeader}>
+              <View style={[styles.levelBadge, { backgroundColor: tc.primary + '20' }]}>
+                <MaterialIcons name="stars" size={20} color={tc.primary} />
+                <Text style={[styles.levelNumber, { color: tc.primary }]}>Level {currentLevel}</Text>
+              </View>
+              <Text style={[styles.levelTitle, { color: tc.textPrimary }]}>{levelTitle}</Text>
+            </View>
+            <View style={styles.xpRow}>
+              <Text style={[styles.xpText, { color: tc.textSecondary }]}>
+                {totalXP} XP {nextMin !== null ? `• ${xpForNext - xpIntoLevel} XP to Level ${currentLevel + 1}` : ''}
+              </Text>
+            </View>
+            {currentLevel < 10 && (
+              <View style={[styles.progressBar, { backgroundColor: tc.border }]}>
+                <View style={[styles.progressFill, { backgroundColor: tc.primary, width: `${progressToNextLevel}%` }]} />
+              </View>
+            )}
+          </View>
 
-        <Text style={[styles.label, { color: tc.textSecondary }]}>Profession</Text>
-        <TextInput style={[styles.input, { backgroundColor: tc.cardBackground, color: tc.textPrimary, borderColor: tc.border }]} value={profession} onChangeText={setProfession} placeholder="e.g. Student, Developer" placeholderTextColor={tc.textSecondary} />
+          {/* Streak */}
+          <View style={styles.streakSection}>
+            <View style={[styles.streakCard, { backgroundColor: tc.warning + '10' }]}>
+              <MaterialIcons name="local-fire-department" size={32} color={tc.warning} />
+              <View style={styles.streakInfo}>
+                <Text style={[styles.streakValue, { color: tc.textPrimary }]}>{currentStreak} Days</Text>
+                <Text style={[styles.streakLabel, { color: tc.textSecondary }]}>Current Streak</Text>
+              </View>
+            </View>
+          </View>
 
-        <Pressable style={styles.saveBtn} onPress={() => { Alert.alert('Saved', 'Profile updated'); router.back(); }}>
-          <LinearGradient colors={[tc.gradientStart, tc.gradientEnd]} style={styles.saveGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <Text style={styles.saveBtnText}>Save Profile</Text>
-          </LinearGradient>
-        </Pressable>
+          {/* Stats Row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <MaterialIcons name="check-circle" size={24} color={tc.success} />
+              <Text style={[styles.statValue, { color: tc.textPrimary }]}>{todosCompleted}</Text>
+              <Text style={[styles.statLabel, { color: tc.textSecondary }]}>Todos Done</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: tc.border }]} />
+            <View style={styles.statItem}>
+              <MaterialIcons name="emoji-events" size={24} color={tc.primary} />
+              <Text style={[styles.statValue, { color: tc.textPrimary }]}>{badges.filter(b => b.unlocked).length}</Text>
+              <Text style={[styles.statLabel, { color: tc.textSecondary }]}>Badges</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: tc.border }]} />
+            <View style={styles.statItem}>
+              <MaterialIcons name="star" size={24} color={tc.warning} />
+              <Text style={[styles.statValue, { color: tc.textPrimary }]}>{totalXP}</Text>
+              <Text style={[styles.statLabel, { color: tc.textSecondary }]}>Total XP</Text>
+            </View>
+          </View>
+
+          {/* Badges Grid */}
+          <View style={styles.badgesSection}>
+            <Text style={[styles.badgesTitle, { color: tc.textPrimary }]}>Badges</Text>
+            <View style={styles.badgesGrid}>
+              {badges.map(badge => (
+                <View 
+                  key={badge.id} 
+                  style={[
+                    styles.badgeCard, 
+                    { backgroundColor: tc.background },
+                    !badge.unlocked && { opacity: 0.4 }
+                  ]}
+                >
+                  <View style={[styles.badgeIcon, { backgroundColor: badge.color + '20' }]}>
+                    <MaterialIcons name={badge.icon as any} size={24} color={badge.unlocked ? badge.color : tc.textSecondary} />
+                  </View>
+                  {badge.unlocked && (
+                    <View style={[styles.checkmark, { backgroundColor: tc.success }]}>
+                      <MaterialIcons name="check" size={12} color="#FFF" />
+                    </View>
+                  )}
+                  <Text style={[styles.badgeTitle, { color: tc.textPrimary }]} numberOfLines={1}>
+                    {badge.title}
+                  </Text>
+                  <Text style={[styles.badgeDesc, { color: tc.textSecondary }]} numberOfLines={2}>
+                    {badge.description}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* Profile Edit Section */}
+        <View style={styles.editSection}>
+          <Text style={[styles.sectionTitle, { color: tc.textPrimary }]}>Personal Information</Text>
+          
+          <Text style={[styles.label, { color: tc.textSecondary }]}>Name</Text>
+          <TextInput 
+            style={[styles.input, { backgroundColor: tc.cardBackground, color: tc.textPrimary, borderColor: tc.border }]} 
+            value={name} 
+            onChangeText={setName} 
+            placeholder="Your name" 
+            placeholderTextColor={tc.textSecondary} 
+          />
+
+          <Text style={[styles.label, { color: tc.textSecondary }]}>Profession</Text>
+          <TextInput 
+            style={[styles.input, { backgroundColor: tc.cardBackground, color: tc.textPrimary, borderColor: tc.border }]} 
+            value={profession} 
+            onChangeText={setProfession} 
+            placeholder="e.g. Student, Developer" 
+            placeholderTextColor={tc.textSecondary} 
+          />
+
+          <Pressable style={styles.saveBtn} onPress={saveProfile}>
+            <LinearGradient colors={[tc.gradientStart, tc.gradientEnd]} style={styles.saveGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+              <Text style={styles.saveBtnText}>Save Profile</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+        
+        <View style={{ height: 50 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -53,14 +221,51 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 50, paddingBottom: 8 },
   headerBtn: { padding: 8, borderRadius: 20, backgroundColor: colors.cardBackground },
   headerTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary },
-  content: { padding: 20, alignItems: 'center' as const },
-  avatarSection: { position: 'relative' as const, marginBottom: 24 },
-  avatar: { width: 100, height: 100, borderRadius: 50, alignItems: 'center' as const, justifyContent: 'center' as const },
+  content: { padding: 20 },
+  avatarSection: { position: 'relative' as const, marginBottom: 24, alignSelf: 'center' as const },
+  avatar: { width: 100, height: 100, borderRadius: 50, alignItems: 'center' as const, justifyContent: 'center' as const, overflow: 'hidden' as const },
   avatarText: { fontSize: 40, fontWeight: '700' as const, color: '#FFF' },
+  avatarPhoto: { width: 100, height: 100, borderRadius: 50 },
   editAvatarBtn: { position: 'absolute' as const, bottom: 0, right: 0, backgroundColor: colors.primary, width: 32, height: 32, borderRadius: 16, alignItems: 'center' as const, justifyContent: 'center' as const, borderWidth: 3, borderColor: colors.background },
-  label: { alignSelf: 'flex-start' as const, fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any, color: colors.textSecondary, marginBottom: 6, marginTop: 16 },
+  
+  gamificationCard: { backgroundColor: colors.cardBackground, borderRadius: 16, padding: 16, marginBottom: 20 },
+  
+  levelSection: { marginBottom: 16 },
+  levelHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  levelBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: colors.primary + '20' },
+  levelNumber: { fontSize: typography.sizes.md, fontWeight: typography.weights.bold as any, color: colors.primary },
+  levelTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary },
+  xpRow: { marginBottom: 8 },
+  xpText: { fontSize: typography.sizes.sm, color: colors.textSecondary },
+  progressBar: { height: 8, borderRadius: 4, backgroundColor: colors.border, overflow: 'hidden' },
+  progressFill: { height: 8, borderRadius: 4, backgroundColor: colors.primary },
+  
+  streakSection: { marginBottom: 16 },
+  streakCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, backgroundColor: colors.warning + '10' },
+  streakInfo: { flex: 1 },
+  streakValue: { fontSize: typography.sizes.xl, fontWeight: typography.weights.bold as any, color: colors.textPrimary },
+  streakLabel: { fontSize: typography.sizes.sm, color: colors.textSecondary },
+  
+  statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 20, paddingVertical: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border + '50' },
+  statItem: { alignItems: 'center', gap: 4 },
+  statValue: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any, color: colors.textPrimary },
+  statLabel: { fontSize: typography.sizes.xs, color: colors.textSecondary },
+  statDivider: { width: 1, height: 40, backgroundColor: colors.border },
+  
+  badgesSection: { },
+  badgesTitle: { fontSize: typography.sizes.md, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary, marginBottom: 12 },
+  badgesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  badgeCard: { width: '30%', aspectRatio: 1, backgroundColor: colors.background, borderRadius: 12, padding: 8, alignItems: 'center', justifyContent: 'center', position: 'relative' as const },
+  badgeIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  checkmark: { position: 'absolute' as const, top: 8, right: 8, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center' },
+  badgeTitle: { fontSize: typography.sizes.xs, fontWeight: typography.weights.medium as any, color: colors.textPrimary, textAlign: 'center' as const },
+  badgeDesc: { fontSize: 9, color: colors.textSecondary, textAlign: 'center' as const, marginTop: 2 },
+  
+  editSection: { marginTop: 8 },
+  sectionTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.semiBold as any, color: colors.textPrimary, marginBottom: 16 },
+  label: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any, color: colors.textSecondary, marginBottom: 6, marginTop: 12 },
   input: { width: '100%' as any, backgroundColor: colors.cardBackground, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: typography.sizes.md, color: colors.textPrimary, borderWidth: 1, borderColor: colors.border },
-  saveBtn: { width: '100%' as any, marginTop: 32 },
+  saveBtn: { width: '100%' as any, marginTop: 24 },
   saveGradient: { paddingVertical: 16, borderRadius: 30, alignItems: 'center' as const },
   saveBtnText: { color: '#FFF', fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any },
 });

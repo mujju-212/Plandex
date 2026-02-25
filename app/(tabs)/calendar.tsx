@@ -68,17 +68,17 @@ export default function CalendarTab() {
       {/* Month Header */}
       <View style={styles.monthHeader}>
         <Pressable onPress={() => setShowSidebar(true)} style={[styles.navBtn, { backgroundColor: tc.cardBackground }]}>
-          <MaterialIcons name="menu" size={24} color={tc.textPrimary} />
+          <MaterialIcons name="menu" size={22} color={tc.textPrimary} />
         </Pressable>
         <Pressable onPress={goToPrevMonth} style={styles.navBtn}>
-          <MaterialIcons name="chevron-left" size={28} color={tc.textPrimary} />
+          <MaterialIcons name="chevron-left" size={24} color={tc.textPrimary} />
         </Pressable>
-        <Text style={[styles.monthTitle, { color: tc.textPrimary }]}>{format(currentMonth, 'MMMM yyyy')}</Text>
+        <Text style={[styles.monthTitle, { color: tc.textPrimary }]} numberOfLines={1}>{format(currentMonth, 'MMMM yyyy')}</Text>
         <Pressable onPress={goToNextMonth} style={styles.navBtn}>
-          <MaterialIcons name="chevron-right" size={28} color={tc.textPrimary} />
+          <MaterialIcons name="chevron-right" size={24} color={tc.textPrimary} />
         </Pressable>
         <Pressable onPress={() => setShowCreateMenu(true)} style={[styles.navBtn, { backgroundColor: tc.primary }]}>
-          <MaterialIcons name="add" size={24} color="#FFF" />
+          <MaterialIcons name="add" size={22} color="#FFF" />
         </Pressable>
       </View>
 
@@ -235,17 +235,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingHorizontal: 12,
+    paddingTop: 30,
     paddingBottom: 12,
+    gap: 6,
   },
   navBtn: {
-    padding: 8,
-    borderRadius: 20,
+    padding: 6,
+    borderRadius: 10,
+    minWidth: 36,
+    alignItems: 'center',
     backgroundColor: colors.cardBackground,
   },
   monthTitle: {
-    fontSize: typography.sizes.xl,
+    fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold as any,
     color: colors.textPrimary,
   },
@@ -320,6 +323,7 @@ const styles = StyleSheet.create({
   },
   detailsContent: {
     paddingHorizontal: 20,
+    paddingBottom: 100,
   },
   emptyDetails: {
     alignItems: 'center',

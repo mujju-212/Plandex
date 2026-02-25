@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, Pressable, Alert } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Stack, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Card from '../../../src/components/common/Card';
+import { useGoalStore } from '../../../src/stores/useGoalStore';
+import { useThemeStore } from '../../../src/stores/useThemeStore';
 import { colors } from '../../../src/theme/colors';
 import { typography } from '../../../src/theme/typography';
-import { useGoalStore } from '../../../src/stores/useGoalStore';
-import { GoalCategory, GoalType, GoalDuration, GoalPriority } from '../../../src/types/goal.types';
-import { useThemeStore } from '../../../src/stores/useThemeStore';
+import { GoalCategory, GoalDuration, GoalPriority, GoalType } from '../../../src/types/goal.types';
 
 const CATEGORIES: { label: string; value: GoalCategory; icon: string; color: string }[] = [
   { label: 'Health', value: 'health', icon: 'favorite', color: '#E91E63' },
@@ -40,6 +41,22 @@ export default function CreateGoalScreen() {
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState('');
   const [milestonesText, setMilestonesText] = useState('');
+
+  // Date picker state
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
+
+  const handleDateChange = (event: any, selectedDate?: Date, type?: 'start' | 'end') => {
+    if (Platform.OS === 'android') {
+      if (type === 'start') setShowStartDatePicker(false);
+      if (type === 'end') setShowEndDatePicker(false);
+    }
+    if (selectedDate) {
+      if (type === 'start') setStartDate(format(selectedDate, 'yyyy-MM-dd'));
+      if (type === 'end') setEndDate(format(selectedDate, 'yyyy-MM-dd'));
+    }
+  };
 
   const handleSave = async () => {
     if (!title.trim()) { Alert.alert('Error', 'Title is required'); return; }
@@ -128,9 +145,33 @@ export default function CreateGoalScreen() {
 
         <Text style={[styles.label, { color: tc.textSecondary }]}>Dates</Text>
         <Card style={styles.card}>
-          <View style={styles.fieldRow}><MaterialIcons name="calendar-today" size={20} color={tc.primary} /><Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Start</Text><TextInput style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]} value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" placeholderTextColor={tc.textSecondary} /></View>
+          <View style={styles.fieldRow}>
+            <MaterialIcons name="calendar-today" size={20} color={tc.primary} />
+            <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Start</Text>
+            {Platform.OS === 'web' ? (
+              <input type="date" value={startDate} onChange={(e: any) => setStartDate(e.target.value)} style={{ flex: 1, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'right', outline: 'none', fontFamily: 'inherit' } as any} />
+            ) : (
+              <Pressable onPress={() => { setTempDate(new Date(startDate)); setShowStartDatePicker(true); }} style={{ flex: 1 }}>
+                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]}>
+                  {format(new Date(startDate), 'MMM dd, yyyy')}
+                </Text>
+              </Pressable>
+            )}
+          </View>
           <View style={[styles.divider, { backgroundColor: tc.border }]} />
-          <View style={styles.fieldRow}><MaterialIcons name="event" size={20} color={tc.warning} /><Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>End</Text><TextInput style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]} value={endDate} onChangeText={setEndDate} placeholder="YYYY-MM-DD (optional)" placeholderTextColor={tc.textSecondary} /></View>
+          <View style={styles.fieldRow}>
+            <MaterialIcons name="event" size={20} color={tc.warning} />
+            <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>End</Text>
+            {Platform.OS === 'web' ? (
+              <input type="date" value={endDate} onChange={(e: any) => setEndDate(e.target.value)} style={{ flex: 1, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'right', outline: 'none', fontFamily: 'inherit' } as any} placeholder="Optional" />
+            ) : (
+              <Pressable onPress={() => { setTempDate(endDate ? new Date(endDate) : new Date()); setShowEndDatePicker(true); }} style={{ flex: 1 }}>
+                <Text style={[styles.fieldInput, { color: endDate ? tc.textPrimary : tc.textSecondary, backgroundColor: tc.background }]}>
+                  {endDate ? format(new Date(endDate), 'MMM dd, yyyy') : 'Optional'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
         </Card>
 
         <Text style={[styles.label, { color: tc.textSecondary }]}>Milestones</Text>
@@ -140,6 +181,14 @@ export default function CreateGoalScreen() {
 
         <View style={{ height: 120 }} />
       </ScrollView>
+
+      {/* Date Pickers for Mobile */}
+      {Platform.OS !== 'web' && showStartDatePicker && (
+        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'start')} />
+      )}
+      {Platform.OS !== 'web' && showEndDatePicker && (
+        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'end')} />
+      )}
 
       <View style={styles.bottomBar}>
         <Pressable onPress={handleSave}>

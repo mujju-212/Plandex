@@ -1,9 +1,5 @@
-import { Platform } from 'react-native';
-import { Habit, HabitCompletion, CreateHabitInput, UpdateHabitInput, HabitFilter } from '../../types/habit.types';
-
-const isWeb = Platform.OS === 'web';
-let AsyncStorage: any = null;
-if (isWeb) { AsyncStorage = require('@react-native-async-storage/async-storage').default; }
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CreateHabitInput, Habit, HabitCompletion, HabitFilter, UpdateHabitInput } from '../../types/habit.types';
 
 const HABITS_KEY = 'habits_data';
 const COMPLETIONS_KEY = 'habit_completions_data';

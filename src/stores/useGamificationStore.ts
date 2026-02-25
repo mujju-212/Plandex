@@ -1,9 +1,7 @@
-import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { gamificationService, XP_AWARDS, LEVELS } from '../services/gamificationService';
-
-let AsyncStorage: any = null;
-if (Platform.OS === 'web') { AsyncStorage = require('@react-native-async-storage/async-storage').default; }
+import { create } from 'zustand';
+import { gamificationService, LEVELS, XP_AWARDS } from '../services/gamificationService';
 
 export interface Badge {
     id: string;
@@ -72,6 +70,31 @@ export const useGamificationStore = create<GamificationState>((set, get) => ({
                     isLoading: false,
                 });
             } else {
+                // Native: read from SQLite
+                try {
+                    const db = (await import('../database/database')).getDB();
+                    const rows = await db.getAllAsync<{
+                        total_xp: number; current_level: number;
+                        current_log_streak: number; total_todos_completed: number;
+                    }>('SELECT total_xp, current_level, current_log_streak, total_todos_completed FROM user_stats LIMIT 1');
+                    if (rows.length) {
+                        const s = rows[0];
+                        const lvl = LEVELS.find(l => l.level === s.current_level) || LEVELS[0];
+                        const badgeRows = await db.getAllAsync<{ badge_id: string }>('SELECT badge_id FROM user_badges');
+                        const unlockedIds = badgeRows.map(r => r.badge_id);
+                        const badges = DEFAULT_BADGES.map(b => ({ ...b, unlocked: unlockedIds.includes(b.id) }));
+                        set({
+                            totalXP: s.total_xp,
+                            currentLevel: s.current_level,
+                            levelTitle: lvl.title,
+                            currentStreak: s.current_log_streak || 0,
+                            todosCompleted: s.total_todos_completed || 0,
+                            badges,
+                        });
+                    }
+                } catch (err) {
+                    console.error('Failed to load native stats', err);
+                }
                 set({ isLoading: false });
             }
         } catch { set({ isLoading: false }); }

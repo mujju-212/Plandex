@@ -1,17 +1,13 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import {
     AppEvent,
     CreateEventInput,
-    UpdateEventInput,
     EventFilter,
+    UpdateEventInput,
 } from '../../types/event.types';
 
 const isWeb = Platform.OS === 'web';
-
-let AsyncStorage: any = null;
-if (isWeb) {
-    AsyncStorage = require('@react-native-async-storage/async-storage').default;
-}
 
 const EVENTS_KEY = 'events_data';
 let nextId = 100;

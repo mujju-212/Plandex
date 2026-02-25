@@ -1,8 +1,5 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { Platform } from 'react-native';
-
-let AsyncStorage: any = null;
-if (Platform.OS === 'web') { AsyncStorage = require('@react-native-async-storage/async-storage').default; }
 
 const THEME_KEY = 'app_theme';
 
@@ -63,18 +60,16 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
         const newIsDark = !get().isDark;
         set({ isDark: newIsDark, colors: newIsDark ? darkColors : lightColors });
         try {
-            if (AsyncStorage) await AsyncStorage.setItem(THEME_KEY, JSON.stringify(newIsDark));
+            await AsyncStorage.setItem(THEME_KEY, JSON.stringify(newIsDark));
         } catch { }
     },
 
     loadTheme: async () => {
         try {
-            if (AsyncStorage) {
-                const raw = await AsyncStorage.getItem(THEME_KEY);
-                if (raw !== null) {
-                    const isDark = JSON.parse(raw);
-                    set({ isDark, colors: isDark ? darkColors : lightColors });
-                }
+            const raw = await AsyncStorage.getItem(THEME_KEY);
+            if (raw !== null) {
+                const isDark = JSON.parse(raw);
+                set({ isDark, colors: isDark ? darkColors : lightColors });
             }
         } catch { }
     },

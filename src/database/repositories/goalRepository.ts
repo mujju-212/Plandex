@@ -1,9 +1,5 @@
-import { Platform } from 'react-native';
-import { Goal, GoalMilestone, CreateGoalInput, UpdateGoalInput, GoalFilter } from '../../types/goal.types';
-
-const isWeb = Platform.OS === 'web';
-let AsyncStorage: any = null;
-if (isWeb) { AsyncStorage = require('@react-native-async-storage/async-storage').default; }
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CreateGoalInput, Goal, GoalFilter, GoalMilestone, UpdateGoalInput } from '../../types/goal.types';
 
 const GOALS_KEY = 'goals_data';
 let nextId = 200;

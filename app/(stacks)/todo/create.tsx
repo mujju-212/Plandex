@@ -1,15 +1,16 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, Pressable, Switch, Alert, Platform } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { addDays, format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
-import { format, addDays } from 'date-fns';
+import { Stack, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Card from '../../../src/components/common/Card';
 import PrioritySelector from '../../../src/components/common/PrioritySelector';
+import { useThemeStore } from '../../../src/stores/useThemeStore';
+import { useTodoStore } from '../../../src/stores/useTodoStore';
 import { colors } from '../../../src/theme/colors';
 import { typography } from '../../../src/theme/typography';
-import { useTodoStore } from '../../../src/stores/useTodoStore';
-import { useThemeStore } from '../../../src/stores/useThemeStore';
 
 type DateType = 'none' | 'single' | 'range';
 type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
@@ -31,11 +32,66 @@ export default function CreateTodoScreen() {
   const [endDate, setEndDate] = useState(format(addDays(new Date(), 7), 'yyyy-MM-dd'));
   const [dueTime, setDueTime] = useState('');
 
+  // Date/Time Picker States
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showRecurringEndPicker, setShowRecurringEndPicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
+
   // Recurring fields
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringType, setRecurringType] = useState<RecurringType>('daily');
   const [recurringInterval, setRecurringInterval] = useState('1');
   const [recurringEndDate, setRecurringEndDate] = useState('');
+
+  const handleDateChange = (event: any, selectedDate?: Date, type?: 'start' | 'end' | 'time' | 'recurringEnd') => {
+    if (Platform.OS === 'android') {
+      setShowStartDatePicker(false);
+      setShowEndDatePicker(false);
+      setShowTimePicker(false);
+      setShowRecurringEndPicker(false);
+    }
+
+    if (selectedDate && type) {
+      if (type === 'start') {
+        setStartDate(format(selectedDate, 'yyyy-MM-dd'));
+      } else if (type === 'end') {
+        setEndDate(format(selectedDate, 'yyyy-MM-dd'));
+      } else if (type === 'time') {
+        setDueTime(format(selectedDate, 'HH:mm'));
+      } else if (type === 'recurringEnd') {
+        setRecurringEndDate(format(selectedDate, 'yyyy-MM-dd'));
+      }
+    }
+  };
+
+  const openStartDatePicker = () => {
+    setTempDate(startDate ? new Date(startDate) : new Date());
+    setShowStartDatePicker(true);
+  };
+
+  const openEndDatePicker = () => {
+    setTempDate(endDate ? new Date(endDate) : addDays(new Date(), 7));
+    setShowEndDatePicker(true);
+  };
+
+  const openTimePicker = () => {
+    if (dueTime) {
+      const [hours, minutes] = dueTime.split(':');
+      const date = new Date();
+      date.setHours(parseInt(hours), parseInt(minutes));
+      setTempDate(date);
+    } else {
+      setTempDate(new Date());
+    }
+    setShowTimePicker(true);
+  };
+
+  const openRecurringEndPicker = () => {
+    setTempDate(recurringEndDate ? new Date(recurringEndDate) : addDays(new Date(), 30));
+    setShowRecurringEndPicker(true);
+  };
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -120,7 +176,7 @@ export default function CreateTodoScreen() {
 
         {/* Date Type Selector */}
         <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>Schedule</Text>
-        <View style={styles.chipRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
           {dateTypeOptions.map(opt => (
             <Pressable
               key={opt.value}
@@ -133,7 +189,7 @@ export default function CreateTodoScreen() {
               </Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
 
         {/* Date Inputs */}
         {dateType !== 'none' && (
@@ -149,7 +205,11 @@ export default function CreateTodoScreen() {
                   style={{ flex: 1, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'right' as any, outline: 'none', fontFamily: 'inherit' } as any}
                 />
               ) : (
-                <TextInput style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]} value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" placeholderTextColor={tc.textSecondary} />
+                <Pressable onPress={openStartDatePicker} style={{ flex: 1 }}>
+                  <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]}>
+                    {startDate ? format(new Date(startDate), 'MMM dd, yyyy') : 'Select date'}
+                  </Text>
+                </Pressable>
               )}
             </View>
 
@@ -167,7 +227,11 @@ export default function CreateTodoScreen() {
                       style={{ flex: 1, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'right' as any, outline: 'none', fontFamily: 'inherit' } as any}
                     />
                   ) : (
-                    <TextInput style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]} value={endDate} onChangeText={setEndDate} placeholder="YYYY-MM-DD" placeholderTextColor={tc.textSecondary} />
+                    <Pressable onPress={openEndDatePicker} style={{ flex: 1 }}>
+                      <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]}>
+                        {endDate ? format(new Date(endDate), 'MMM dd, yyyy') : 'Select date'}
+                      </Text>
+                    </Pressable>
                   )}
                 </View>
               </>
@@ -185,7 +249,11 @@ export default function CreateTodoScreen() {
                   style={{ flex: 1, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'right' as any, outline: 'none', fontFamily: 'inherit' } as any}
                 />
               ) : (
-                <TextInput style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]} value={dueTime} onChangeText={setDueTime} placeholder="HH:MM" placeholderTextColor={tc.textSecondary} />
+                <Pressable onPress={openTimePicker} style={{ flex: 1 }}>
+                  <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]}>
+                    {dueTime ? dueTime : 'Select time'}
+                  </Text>
+                </Pressable>
               )}
             </View>
           </Card>
@@ -194,9 +262,9 @@ export default function CreateTodoScreen() {
         {/* Priority */}
         <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>Priority</Text>
         <Card style={styles.inputCard}>
-          <View style={styles.fieldRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.fieldRow}>
             <PrioritySelector selected={priority} onSelect={setPriority} />
-          </View>
+          </ScrollView>
         </Card>
 
         {/* Recurring */}
@@ -216,7 +284,7 @@ export default function CreateTodoScreen() {
           {isRecurring && (
             <>
               <View style={[styles.divider, { backgroundColor: tc.border }]} />
-              <View style={styles.recurringChips}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recurringChips}>
                 {recurringOptions.map(opt => (
                   <Pressable
                     key={opt.value}
@@ -228,7 +296,7 @@ export default function CreateTodoScreen() {
                     </Text>
                   </Pressable>
                 ))}
-              </View>
+              </ScrollView>
 
               <View style={[styles.divider, { backgroundColor: tc.border }]} />
               <View style={styles.fieldRow}>
@@ -251,13 +319,21 @@ export default function CreateTodoScreen() {
               <View style={styles.fieldRow}>
                 <MaterialIcons name="event-busy" size={20} color={tc.danger} />
                 <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Until</Text>
-                <TextInput
-                  style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]}
-                  value={recurringEndDate}
-                  onChangeText={setRecurringEndDate}
-                  placeholder="YYYY-MM-DD (optional)"
-                  placeholderTextColor={tc.textSecondary}
-                />
+                {Platform.OS === 'web' ? (
+                  <TextInput
+                    style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]}
+                    value={recurringEndDate}
+                    onChangeText={setRecurringEndDate}
+                    placeholder="YYYY-MM-DD (optional)"
+                    placeholderTextColor={tc.textSecondary}
+                  />
+                ) : (
+                  <Pressable onPress={openRecurringEndPicker} style={{ flex: 1 }}>
+                    <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]}>
+                      {recurringEndDate ? format(new Date(recurringEndDate), 'MMM dd, yyyy') : 'Optional'}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
             </>
           )}
@@ -309,6 +385,47 @@ export default function CreateTodoScreen() {
           </LinearGradient>
         </Pressable>
       </View>
+
+      {/* Date/Time Pickers for Mobile */}
+      {Platform.OS !== 'web' && showStartDatePicker && (
+        <DateTimePicker
+          value={tempDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(event, date) => handleDateChange(event, date, 'start')}
+          onTouchCancel={() => setShowStartDatePicker(false)}
+        />
+      )}
+
+      {Platform.OS !== 'web' && showEndDatePicker && (
+        <DateTimePicker
+          value={tempDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(event, date) => handleDateChange(event, date, 'end')}
+          onTouchCancel={() => setShowEndDatePicker(false)}
+        />
+      )}
+
+      {Platform.OS !== 'web' && showTimePicker && (
+        <DateTimePicker
+          value={tempDate}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(event, date) => handleDateChange(event, date, 'time')}
+          onTouchCancel={() => setShowTimePicker(false)}
+        />
+      )}
+
+      {Platform.OS !== 'web' && showRecurringEndPicker && (
+        <DateTimePicker
+          value={tempDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(event, date) => handleDateChange(event, date, 'recurringEnd')}
+          onTouchCancel={() => setShowRecurringEndPicker(false)}
+        />
+      )}
     </View>
   );
 }
@@ -338,7 +455,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.border, marginLeft: 16 },
   descInput: { padding: 16, height: 80, fontSize: typography.sizes.md, color: colors.textPrimary },
 
-  chipRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  chipRow: { flexDirection: 'row', gap: 8, paddingBottom: 8, paddingRight: 20 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
@@ -358,7 +475,7 @@ const styles = StyleSheet.create({
   },
   fieldSuffix: { fontSize: typography.sizes.sm, color: colors.textSecondary },
 
-  recurringChips: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  recurringChips: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingVertical: 8, paddingRight: 14 },
   miniChip: {
     paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16,
     backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border,

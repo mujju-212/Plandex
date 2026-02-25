@@ -75,6 +75,10 @@ export const initializeDatabase = async () => {
         total_todos_completed INTEGER DEFAULT 0,
         last_active_date TEXT
       );
+
+      CREATE TABLE IF NOT EXISTS user_badges (
+        badge_id TEXT PRIMARY KEY
+      );
     `);
 
     // Ensure at least one stats row exists for gamification/tracking

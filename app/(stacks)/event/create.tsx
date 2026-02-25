@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, Pressable, Switch, Alert, Platform } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Stack, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Card from '../../../src/components/common/Card';
+import { useEventStore } from '../../../src/stores/useEventStore';
+import { useThemeStore } from '../../../src/stores/useThemeStore';
 import { colors } from '../../../src/theme/colors';
 import { typography } from '../../../src/theme/typography';
-import { useEventStore } from '../../../src/stores/useEventStore';
 import { EventCategory } from '../../../src/types/event.types';
-import { useThemeStore } from '../../../src/stores/useThemeStore';
 
 const CATEGORIES: { label: string; value: EventCategory; icon: string; color: string }[] = [
   { label: 'General', value: 'general', icon: 'event', color: '#1A73E8' },
@@ -44,6 +45,32 @@ export default function CreateEventScreen() {
   const [recurringType, setRecurringType] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [recurringInterval, setRecurringInterval] = useState('1');
   const [recurringEndDate, setRecurringEndDate] = useState('');
+
+  // Date/Time Picker States
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [showRecurringEndPicker, setShowRecurringEndPicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
+
+  const handleDateChange = (event: any, selectedDate?: Date, type?: string) => {
+    if (Platform.OS === 'android') {
+      setShowStartDatePicker(false);
+      setShowStartTimePicker(false);
+      setShowEndDatePicker(false);
+      setShowEndTimePicker(false);
+      setShowRecurringEndPicker(false);
+    }
+
+    if (selectedDate && type) {
+      if (type === 'startDate') setStartDate(format(selectedDate, 'yyyy-MM-dd'));
+      else if (type === 'startTime') setStartTime(format(selectedDate, 'HH:mm'));
+      else if (type === 'endDate') setEndDate(format(selectedDate, 'yyyy-MM-dd'));
+      else if (type === 'endTime') setEndTime(format(selectedDate, 'HH:mm'));
+      else if (type === 'recurringEnd') setRecurringEndDate(format(selectedDate, 'yyyy-MM-dd'));
+    }
+  };
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -134,12 +161,20 @@ export default function CreateEventScreen() {
             {Platform.OS === 'web' ? (
               <input type="date" value={startDate} onChange={(e: any) => setStartDate(e.target.value)} style={{ flex: 1, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'right', outline: 'none', fontFamily: 'inherit' } as any} />
             ) : (
-              <TextInput style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]} value={startDate} onChangeText={setStartDate} placeholder="YYYY-MM-DD" placeholderTextColor={tc.textSecondary} />
+              <Pressable onPress={() => { setTempDate(new Date(startDate)); setShowStartDatePicker(true); }} style={{ flex: 1 }}>
+                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]}>
+                  {format(new Date(startDate), 'MMM dd, yyyy')}
+                </Text>
+              </Pressable>
             )}
             {!isAllDay && (Platform.OS === 'web' ? (
               <input type="time" value={startTime} onChange={(e: any) => setStartTime(e.target.value)} style={{ width: 100, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'center', outline: 'none', fontFamily: 'inherit' } as any} />
             ) : (
-              <TextInput style={[styles.fieldInput, { width: 70, color: tc.textPrimary, backgroundColor: tc.background }]} value={startTime} onChangeText={setStartTime} placeholder="HH:MM" placeholderTextColor={tc.textSecondary} />
+              <Pressable onPress={() => { const [h, m] = startTime.split(':'); const d = new Date(); d.setHours(parseInt(h), parseInt(m)); setTempDate(d); setShowStartTimePicker(true); }} style={{ width: 70 }}>
+                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background, textAlign: 'center' }]}>
+                  {startTime}
+                </Text>
+              </Pressable>
             ))}
           </View>
           <View style={[styles.divider, { backgroundColor: tc.border }]} />
@@ -149,12 +184,20 @@ export default function CreateEventScreen() {
             {Platform.OS === 'web' ? (
               <input type="date" value={endDate} onChange={(e: any) => setEndDate(e.target.value)} style={{ flex: 1, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'right', outline: 'none', fontFamily: 'inherit' } as any} />
             ) : (
-              <TextInput style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]} value={endDate} onChangeText={setEndDate} placeholder="YYYY-MM-DD" placeholderTextColor={tc.textSecondary} />
+              <Pressable onPress={() => { setTempDate(new Date(endDate)); setShowEndDatePicker(true); }} style={{ flex: 1 }}>
+                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]}>
+                  {format(new Date(endDate), 'MMM dd, yyyy')}
+                </Text>
+              </Pressable>
             )}
             {!isAllDay && (Platform.OS === 'web' ? (
               <input type="time" value={endTime} onChange={(e: any) => setEndTime(e.target.value)} style={{ width: 100, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'center', outline: 'none', fontFamily: 'inherit' } as any} />
             ) : (
-              <TextInput style={[styles.fieldInput, { width: 70, color: tc.textPrimary, backgroundColor: tc.background }]} value={endTime} onChangeText={setEndTime} placeholder="HH:MM" placeholderTextColor={tc.textSecondary} />
+              <Pressable onPress={() => { const [h, m] = endTime.split(':'); const d = new Date(); d.setHours(parseInt(h), parseInt(m)); setTempDate(d); setShowEndTimePicker(true); }} style={{ width: 70 }}>
+                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background, textAlign: 'center' }]}>
+                  {endTime}
+                </Text>
+              </Pressable>
             ))}
           </View>
         </Card>
@@ -179,13 +222,13 @@ export default function CreateEventScreen() {
           {isRecurring && (
             <>
               <View style={[styles.divider, { backgroundColor: tc.border }]} />
-              <View style={styles.recurringChips}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recurringChips}>
                 {(['daily', 'weekly', 'monthly'] as const).map(opt => (
                   <Pressable key={opt} style={[styles.miniChip, { backgroundColor: tc.background, borderColor: tc.border }, recurringType === opt && { backgroundColor: tc.primary, borderColor: tc.primary }]} onPress={() => setRecurringType(opt)}>
                     <Text style={[styles.miniChipText, { color: tc.textSecondary }, recurringType === opt && { color: '#FFF' }]}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</Text>
                   </Pressable>
                 ))}
-              </View>
+              </ScrollView>
               <View style={[styles.divider, { backgroundColor: tc.border }]} />
               <View style={styles.fieldRow}>
                 <MaterialIcons name="loop" size={20} color={tc.textSecondary} />
@@ -197,7 +240,15 @@ export default function CreateEventScreen() {
               <View style={styles.fieldRow}>
                 <MaterialIcons name="event-busy" size={20} color={tc.danger} />
                 <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Until</Text>
-                <TextInput style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background }]} value={recurringEndDate} onChangeText={setRecurringEndDate} placeholder="YYYY-MM-DD (optional)" placeholderTextColor={tc.textSecondary} />
+                {Platform.OS === 'web' ? (
+                  <input type="date" value={recurringEndDate} onChange={(e: any) => setRecurringEndDate(e.target.value)} style={{ flex: 1, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'right', outline: 'none', fontFamily: 'inherit' } as any} placeholder="Optional" />
+                ) : (
+                  <Pressable onPress={() => { setTempDate(recurringEndDate ? new Date(recurringEndDate) : new Date()); setShowRecurringEndPicker(true); }} style={{ flex: 1 }}>
+                    <Text style={[styles.fieldInput, { color: recurringEndDate ? tc.textPrimary : tc.textSecondary, backgroundColor: tc.background }]}>
+                      {recurringEndDate ? format(new Date(recurringEndDate), 'MMM dd, yyyy') : 'Optional'}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
             </>
           )}
@@ -205,6 +256,23 @@ export default function CreateEventScreen() {
 
         <View style={{ height: 120 }} />
       </ScrollView>
+
+      {/* Date/Time Pickers for Mobile */}
+      {Platform.OS !== 'web' && showStartDatePicker && (
+        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'startDate')} />
+      )}
+      {Platform.OS !== 'web' && showStartTimePicker && (
+        <DateTimePicker value={tempDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'startTime')} />
+      )}
+      {Platform.OS !== 'web' && showEndDatePicker && (
+        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'endDate')} />
+      )}
+      {Platform.OS !== 'web' && showEndTimePicker && (
+        <DateTimePicker value={tempDate} mode="time" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'endTime')} />
+      )}
+      {Platform.OS !== 'web' && showRecurringEndPicker && (
+        <DateTimePicker value={tempDate} mode="date" display={Platform.OS === 'ios' ? 'spinner' : 'default'} onChange={(event, date) => handleDateChange(event, date, 'recurringEnd')} />
+      )}
 
       <View style={styles.bottomContainer}>
         <Pressable style={styles.mainSaveBtn} onPress={handleSave}>
@@ -239,7 +307,7 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: typography.sizes.md, fontWeight: typography.weights.medium as any, color: colors.textPrimary, minWidth: 60 },
   fieldInput: { flex: 1, fontSize: typography.sizes.sm, color: colors.textPrimary, textAlign: 'right' as const, backgroundColor: colors.background, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
   fieldSuffix: { fontSize: typography.sizes.sm, color: colors.textSecondary },
-  recurringChips: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  recurringChips: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingVertical: 8, paddingRight: 20 },
   miniChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
   miniChipText: { fontSize: typography.sizes.xs, color: colors.textSecondary, fontWeight: typography.weights.medium as any },
   bottomContainer: { position: 'absolute', bottom: 32, left: 20, right: 20 },

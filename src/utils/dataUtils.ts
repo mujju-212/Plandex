@@ -1,7 +1,5 @@
-import { Platform, Alert } from 'react-native';
-
-let AsyncStorage: any = null;
-if (Platform.OS === 'web') { AsyncStorage = require('@react-native-async-storage/async-storage').default; }
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 const ALL_KEYS = [
     'todos_data',
