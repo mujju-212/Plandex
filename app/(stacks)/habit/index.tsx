@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useHabitStore } from '../../../src/stores/useHabitStore';
 import { useThemeStore } from '../../../src/stores/useThemeStore';
@@ -14,7 +14,7 @@ export default function HabitListScreen() {
   const { habits, loadHabits, isLoading } = useHabitStore();
   const [filter, setFilter] = useState<HabitFilter>('all');
 
-  useEffect(() => { loadHabits(); }, []);
+  useFocusEffect(useCallback(() => { loadHabits(); }, []));
 
   const activeHabits = habits.filter(h => h.is_active);
   const pausedHabits = habits.filter(h => !h.is_active);
@@ -29,8 +29,9 @@ export default function HabitListScreen() {
     if (habit.frequency_type === 'daily') return 'Daily';
     if (habit.frequency_type === 'x_per_week') return `${habit.times_per_week}x/wk`;
     if (habit.frequency_type === 'specific_days') {
-      const names = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-      return habit.specific_days?.map((d: number) => names[d]).join(' ') || 'Specific days';
+      // Days are stored 1-based Mon-first: Mon=1, Tue=2, ..., Sun=7
+      const names: Record<number, string> = { 1: 'Mo', 2: 'Tu', 3: 'We', 4: 'Th', 5: 'Fr', 6: 'Sa', 7: 'Su' };
+      return habit.specific_days?.map((d: number) => names[d] ?? '?').join(' ') || 'Specific days';
     }
     return 'Custom';
   };

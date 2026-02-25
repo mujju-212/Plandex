@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { format, isThisWeek, isToday, isTomorrow } from 'date-fns';
-import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useEventStore } from '../../../src/stores/useEventStore';
 import { useThemeStore } from '../../../src/stores/useThemeStore';
@@ -15,7 +15,7 @@ export default function EventListScreen() {
   const { events, loadEvents, isLoading } = useEventStore();
   const [filter, setFilter] = useState<Filter>('today');
 
-  useEffect(() => { loadEvents(); }, []);
+  useFocusEffect(useCallback(() => { loadEvents(); }, []));
 
   const todayEvents = events.filter(e => isToday(new Date(e.start_datetime)));
   const upcomingEvents = events.filter(e => e.status === 'upcoming');

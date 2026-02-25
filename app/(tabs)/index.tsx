@@ -1,16 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Alert, Pressable, Modal, Platform } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import FAB from '../../src/components/common/FAB';
+import Sidebar from '../../src/components/common/Sidebar';
 import GreetingHeader from '../../src/components/dashboard/GreetingHeader';
 import TodaySummary from '../../src/components/dashboard/TodaySummary';
 import TodoItem from '../../src/components/todo/TodoItem';
-import FAB from '../../src/components/common/FAB';
-import Sidebar from '../../src/components/common/Sidebar';
+import { useThemeStore } from '../../src/stores/useThemeStore';
+import { useTodoStore } from '../../src/stores/useTodoStore';
 import { colors } from '../../src/theme/colors';
 import { typography } from '../../src/theme/typography';
-import { useTodoStore } from '../../src/stores/useTodoStore';
-import { useThemeStore } from '../../src/stores/useThemeStore';
 
 export default function HomeTab() {
   const router = useRouter();
@@ -18,12 +19,22 @@ export default function HomeTab() {
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [userName, setUserName] = useState('User');
 
   const { todos, loadTodos, completeTodo, uncompleteTodo } = useTodoStore();
 
   useEffect(() => {
     loadTodos();
   }, [loadTodos]);
+
+  // Reload user name every time screen gains focus (e.g. after profile edit)
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem('profile_name').then(name => {
+        if (name) setUserName(name);
+      });
+    }, [])
+  );
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -53,7 +64,7 @@ export default function HomeTab() {
       <Stack.Screen options={{ headerShown: false }} />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <GreetingHeader
-          name="Mujju"
+          name={userName}
           unreadCount={pendingCount}
           onMenuPress={() => setShowSidebar(true)}
           onSearchPress={() => router.push('/search')}

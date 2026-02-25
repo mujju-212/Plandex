@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
+import { cancelAllNotifications } from '../services/notificationService';
 
 const SETTINGS_KEY = 'app_settings';
 
@@ -15,6 +16,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     toggleNotifications: async () => {
         const newVal = !get().notificationsEnabled;
         set({ notificationsEnabled: newVal });
+
+        // If disabling, cancel all scheduled notifications
+        if (!newVal) {
+            await cancelAllNotifications();
+        }
+
         try {
             const raw = await AsyncStorage.getItem(SETTINGS_KEY);
             const settings = raw ? JSON.parse(raw) : {};

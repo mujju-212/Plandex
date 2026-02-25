@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { AppEvent, CreateEventInput, UpdateEventInput, EventFilter } from '../types/event.types';
 import { eventService } from '../services/eventService';
+import { scheduleEventReminder } from '../services/notificationService';
+import { AppEvent, CreateEventInput, EventFilter, UpdateEventInput } from '../types/event.types';
 
 interface EventState {
     events: AppEvent[];
@@ -47,6 +48,8 @@ export const useEventStore = create<EventState>((set, get) => ({
     addEvent: async (input: CreateEventInput) => {
         try {
             const event = await eventService.createEvent(input);
+            // Schedule reminder 15 minutes before event
+            scheduleEventReminder(event.id, event.title, event.start_datetime).catch(() => {});
             set(state => ({ events: [event, ...state.events] }));
             return event;
         } catch (error: any) {

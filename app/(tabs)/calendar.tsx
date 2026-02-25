@@ -53,7 +53,12 @@ export default function CalendarTab() {
     const hasTodos = todos.some(t => t.start_date === dateStr || t.end_date === dateStr);
     const hasLog = logs.some(l => l.date === dateStr);
     const hasCompleted = todos.some(t => (t.start_date === dateStr) && t.status === 'completed');
-    return { hasTodos, hasLog, hasCompleted };
+    const hasEvents = events.some(e => {
+      const startDate = e.start_datetime.split('T')[0];
+      const endDate = e.end_datetime ? e.end_datetime.split('T')[0] : startDate;
+      return dateStr >= startDate && dateStr <= endDate;
+    });
+    return { hasTodos, hasLog, hasCompleted, hasEvents };
   };
 
   // Get items for selected date
@@ -118,6 +123,7 @@ export default function CalendarTab() {
               <View style={styles.dotRow}>
                 {dots.hasTodos && <View style={[styles.dot, { backgroundColor: tc.primary }]} />}
                 {dots.hasLog && <View style={[styles.dot, { backgroundColor: tc.success }]} />}
+                {dots.hasEvents && <View style={[styles.dot, { backgroundColor: tc.danger }]} />}
                 {dots.hasCompleted && <View style={[styles.dot, { backgroundColor: tc.warning }]} />}
               </View>
             </TouchableOpacity>

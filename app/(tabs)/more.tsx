@@ -2,10 +2,13 @@ import { Feather, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Linking from 'expo-linking';
 import { useFocusEffect, useRouter } from 'expo-router';
+import * as StoreReview from 'expo-store-review';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, Share, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import Sidebar from '../../src/components/common/Sidebar';
+import { requestNotificationPermissions } from '../../src/services/notificationService';
 import { useGamificationStore } from '../../src/stores/useGamificationStore';
 import { useSettingsStore } from '../../src/stores/useSettingsStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
@@ -89,6 +92,47 @@ export default function MoreTab() {
         }
       },
     ]);
+  };
+
+  const handleToggleNotifications = async () => {
+    const newVal = !notificationsEnabled;
+    if (newVal) {
+      const granted = await requestNotificationPermissions();
+      if (!granted) {
+        Alert.alert(
+          'Permission Required',
+          'Please enable notifications in your device settings to receive reminders.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ],
+        );
+        return;
+      }
+    }
+    toggleNotifications();
+  };
+
+  const handleRateApp = async () => {
+    try {
+      // requestReview works in production builds; in Expo Go it may throw
+      await StoreReview.requestReview();
+    } catch {
+      Alert.alert(
+        'Rate App',
+        'In-app review is only available in production builds. Thank you for wanting to rate MyPlanner!',
+      );
+    }
+  };
+
+  const handleShareApp = async () => {
+    try {
+      await Share.share({
+        title: 'MyPlanner - Your Productivity Partner',
+        message:
+          'Hey! Check out MyPlanner — it helps me stay organized with todos, habits, goals, and daily logs. It\'s completely offline and free! 🚀\n\nhttps://myplanner.app',
+      });
+    } catch { }
   };
 
   return (
@@ -182,7 +226,7 @@ export default function MoreTab() {
             rightElement={
               <Switch
                 value={notificationsEnabled}
-                onValueChange={toggleNotifications}
+                onValueChange={handleToggleNotifications}
                 trackColor={{ false: colors.border, true: colors.primary }}
                 thumbColor="#FFF"
               />
@@ -202,8 +246,8 @@ export default function MoreTab() {
         <Text style={[styles.sectionLabel, { color: themeColors.textSecondary }]}>About</Text>
         <View style={[styles.menuGroup, { backgroundColor: themeColors.cardBackground }]}>
           <MenuItem icon="info" title="About MyPlanner" subtitle="Version 1.0.0" />
-          <MenuItem icon="star" title="Rate App" />
-          <MenuItem icon="share" iconFamily="feather" title="Share with Friends" />
+          <MenuItem icon="star" title="Rate App" subtitle="Love it? Leave a review!" onPress={handleRateApp} />
+          <MenuItem icon="share" iconFamily="feather" title="Share with Friends" subtitle="Spread the word" onPress={handleShareApp} />
         </View>
 
         <View style={{ height: 40 }} />

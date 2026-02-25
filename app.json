@@ -39,7 +39,15 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-document-picker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#1A73E8"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

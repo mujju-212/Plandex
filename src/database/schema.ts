@@ -79,6 +79,89 @@ export const initializeDatabase = async () => {
       CREATE TABLE IF NOT EXISTS user_badges (
         badge_id TEXT PRIMARY KEY
       );
+
+      CREATE TABLE IF NOT EXISTS habits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        category TEXT DEFAULT 'general',
+        frequency_type TEXT DEFAULT 'daily',
+        specific_days TEXT DEFAULT '[]',
+        times_per_week INTEGER,
+        time_of_day TEXT DEFAULT 'anytime',
+        reminder_time TEXT,
+        color TEXT DEFAULT '#00BFA5',
+        icon TEXT DEFAULT 'check-circle',
+        current_streak INTEGER DEFAULT 0,
+        longest_streak INTEGER DEFAULT 0,
+        total_completions INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT 1,
+        start_date TEXT,
+        end_date TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS habit_completions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        habit_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        notes TEXT,
+        FOREIGN KEY (habit_id) REFERENCES habits(id) ON DELETE CASCADE,
+        UNIQUE(habit_id, date)
+      );
+
+      CREATE TABLE IF NOT EXISTS goals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        category TEXT DEFAULT 'general',
+        goal_type TEXT DEFAULT 'achievement',
+        target_value REAL,
+        current_value REAL DEFAULT 0,
+        unit TEXT,
+        duration_type TEXT DEFAULT 'custom',
+        start_date TEXT,
+        end_date TEXT,
+        status TEXT DEFAULT 'not_started',
+        priority TEXT DEFAULT 'medium',
+        color TEXT DEFAULT '#4CAF50',
+        icon TEXT DEFAULT 'target',
+        completed_at DATETIME,
+        completion_notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS goal_milestones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        goal_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        target_date TEXT,
+        is_completed BOOLEAN DEFAULT 0,
+        completed_at DATETIME,
+        position INTEGER DEFAULT 0,
+        FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        description TEXT,
+        event_type TEXT DEFAULT 'single',
+        start_datetime TEXT NOT NULL,
+        end_datetime TEXT,
+        is_all_day BOOLEAN DEFAULT 0,
+        location TEXT,
+        color TEXT DEFAULT '#1A73E8',
+        category TEXT DEFAULT 'general',
+        is_recurring BOOLEAN DEFAULT 0,
+        recurring_pattern TEXT,
+        status TEXT DEFAULT 'upcoming',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Ensure at least one stats row exists for gamification/tracking

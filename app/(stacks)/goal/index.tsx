@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { differenceInDays } from 'date-fns';
-import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useGoalStore } from '../../../src/stores/useGoalStore';
 import { useThemeStore } from '../../../src/stores/useThemeStore';
@@ -15,7 +15,7 @@ export default function GoalListScreen() {
   const { goals, loadGoals, isLoading } = useGoalStore();
   const [filter, setFilter] = useState<GoalFilter>('all');
 
-  useEffect(() => { loadGoals(); }, []);
+  useFocusEffect(useCallback(() => { loadGoals(); }, []));
 
   const activeGoals = goals.filter(g => g.status === 'in_progress' || g.status === 'not_started');
   const achievedGoals = goals.filter(g => g.status === 'achieved');

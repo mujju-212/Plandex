@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { Todo, CreateTodoInput, UpdateTodoInput, TodoFilter } from '../types/todo.types';
+import { scheduleTodoReminder } from '../services/notificationService';
 import { todoService } from '../services/todoService';
+import { CreateTodoInput, Todo, TodoFilter, UpdateTodoInput } from '../types/todo.types';
 
 interface TodoState {
     todos: Todo[];
@@ -54,6 +55,10 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     addTodo: async (input: CreateTodoInput) => {
         try {
             const todo = await todoService.createTodo(input);
+            // Schedule notification if todo has a due date
+            if (todo.start_date) {
+                scheduleTodoReminder(todo.id, todo.title, todo.start_date, todo.due_time || undefined).catch(() => {});
+            }
             set(state => ({ todos: [todo, ...state.todos] }));
             return todo;
         } catch (error: any) {

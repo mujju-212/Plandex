@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { Goal, CreateGoalInput, UpdateGoalInput, GoalFilter } from '../types/goal.types';
 import { goalService } from '../services/goalService';
+import { scheduleGoalDeadlineReminder } from '../services/notificationService';
+import { CreateGoalInput, Goal, GoalFilter, UpdateGoalInput } from '../types/goal.types';
 
 interface GoalState {
     goals: Goal[];
@@ -32,34 +33,50 @@ export const useGoalStore = create<GoalState>((set) => ({
     },
 
     addGoal: async (input) => {
-        const goal = await goalService.createGoal(input);
-        set(s => ({ goals: [goal, ...s.goals] }));
-        return goal;
+        try {
+            const goal = await goalService.createGoal(input);
+            // Schedule reminder 1 day before goal deadline
+            if (goal.end_date) {
+                scheduleGoalDeadlineReminder(goal.id, goal.title, goal.end_date).catch(() => {});
+            }
+            set(s => ({ goals: [goal, ...s.goals] }));
+            return goal;
+        } catch (e: any) { set({ error: e.message }); throw e; }
     },
 
     updateGoal: async (id, input) => {
-        const goal = await goalService.updateGoal(id, input);
-        set(s => ({ goals: s.goals.map(g => g.id === id ? goal : g), selectedGoal: s.selectedGoal?.id === id ? goal : s.selectedGoal }));
+        try {
+            const goal = await goalService.updateGoal(id, input);
+            set(s => ({ goals: s.goals.map(g => g.id === id ? goal : g), selectedGoal: s.selectedGoal?.id === id ? goal : s.selectedGoal }));
+        } catch (e: any) { set({ error: e.message }); }
     },
 
     deleteGoal: async (id) => {
-        await goalService.deleteGoal(id);
-        set(s => ({ goals: s.goals.filter(g => g.id !== id), selectedGoal: s.selectedGoal?.id === id ? null : s.selectedGoal }));
+        try {
+            await goalService.deleteGoal(id);
+            set(s => ({ goals: s.goals.filter(g => g.id !== id), selectedGoal: s.selectedGoal?.id === id ? null : s.selectedGoal }));
+        } catch (e: any) { set({ error: e.message }); }
     },
 
     achieveGoal: async (id, notes?) => {
-        const goal = await goalService.achieveGoal(id, notes);
-        set(s => ({ goals: s.goals.map(g => g.id === id ? goal : g) }));
+        try {
+            const goal = await goalService.achieveGoal(id, notes);
+            set(s => ({ goals: s.goals.map(g => g.id === id ? goal : g) }));
+        } catch (e: any) { set({ error: e.message }); }
     },
 
     updateProgress: async (id, value) => {
-        const goal = await goalService.updateProgress(id, value);
-        set(s => ({ goals: s.goals.map(g => g.id === id ? goal : g) }));
+        try {
+            const goal = await goalService.updateProgress(id, value);
+            set(s => ({ goals: s.goals.map(g => g.id === id ? goal : g) }));
+        } catch (e: any) { set({ error: e.message }); }
     },
 
     completeMilestone: async (goalId, milestoneId) => {
-        const goal = await goalService.completeMilestone(goalId, milestoneId);
-        set(s => ({ goals: s.goals.map(g => g.id === goalId ? goal : g), selectedGoal: s.selectedGoal?.id === goalId ? goal : s.selectedGoal }));
+        try {
+            const goal = await goalService.completeMilestone(goalId, milestoneId);
+            set(s => ({ goals: s.goals.map(g => g.id === goalId ? goal : g), selectedGoal: s.selectedGoal?.id === goalId ? goal : s.selectedGoal }));
+        } catch (e: any) { set({ error: e.message }); }
     },
 
     selectGoal: (goal) => set({ selectedGoal: goal }),

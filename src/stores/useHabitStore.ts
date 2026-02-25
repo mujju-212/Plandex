@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { Habit, HabitCompletion, CreateHabitInput, UpdateHabitInput, HabitFilter } from '../types/habit.types';
 import { habitService } from '../services/habitService';
+import { scheduleHabitReminder } from '../services/notificationService';
+import { CreateHabitInput, Habit, HabitCompletion, HabitFilter, UpdateHabitInput } from '../types/habit.types';
 
 interface HabitState {
     habits: Habit[];
@@ -30,41 +31,54 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     },
 
     loadTodayCompletions: async () => {
-        const today = new Date().toISOString().split('T')[0];
-        const completions = await habitService.getCompletionsForDate(today);
-        set({ todayCompletions: completions });
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const completions = await habitService.getCompletionsForDate(today);
+            set({ todayCompletions: completions });
+        } catch (e: any) { set({ error: e.message }); }
     },
 
     addHabit: async (input) => {
-        const habit = await habitService.createHabit(input);
-        set(s => ({ habits: [habit, ...s.habits] }));
-        return habit;
+        try {
+            const habit = await habitService.createHabit(input);
+            // Schedule daily reminder if reminder_time is set
+            if (habit.reminder_time) {
+                scheduleHabitReminder(habit.id, habit.title, habit.reminder_time).catch(() => {});
+            }
+            set(s => ({ habits: [habit, ...s.habits] }));
+            return habit;
+        } catch (e: any) { set({ error: e.message }); throw e; }
     },
 
     updateHabit: async (id, input) => {
-        const habit = await habitService.updateHabit(id, input);
-        set(s => ({ habits: s.habits.map(h => h.id === id ? habit : h) }));
+        try {
+            const habit = await habitService.updateHabit(id, input);
+            set(s => ({ habits: s.habits.map(h => h.id === id ? habit : h) }));
+        } catch (e: any) { set({ error: e.message }); }
     },
 
     deleteHabit: async (id) => {
-        await habitService.deleteHabit(id);
-        set(s => ({ habits: s.habits.filter(h => h.id !== id) }));
+        try {
+            await habitService.deleteHabit(id);
+            set(s => ({ habits: s.habits.filter(h => h.id !== id) }));
+        } catch (e: any) { set({ error: e.message }); }
     },
 
     toggleCompletion: async (habitId, date) => {
-        const { todayCompletions } = get();
-        const existing = todayCompletions.find(c => c.habit_id === habitId && c.date === date);
-        if (existing) {
-            await habitService.undoCompletion(habitId, date);
-            set(s => ({ todayCompletions: s.todayCompletions.filter(c => !(c.habit_id === habitId && c.date === date)) }));
-            // Refresh habits for updated streak
-            const habits = await habitService.getHabits();
-            set({ habits });
-        } else {
-            const comp = await habitService.logCompletion(habitId, date);
-            set(s => ({ todayCompletions: [...s.todayCompletions, comp] }));
-            const habits = await habitService.getHabits();
-            set({ habits });
-        }
+        try {
+            const { todayCompletions } = get();
+            const existing = todayCompletions.find(c => c.habit_id === habitId && c.date === date);
+            if (existing) {
+                await habitService.undoCompletion(habitId, date);
+                set(s => ({ todayCompletions: s.todayCompletions.filter(c => !(c.habit_id === habitId && c.date === date)) }));
+                const habits = await habitService.getHabits();
+                set({ habits });
+            } else {
+                const comp = await habitService.logCompletion(habitId, date);
+                set(s => ({ todayCompletions: [...s.todayCompletions, comp] }));
+                const habits = await habitService.getHabits();
+                set({ habits });
+            }
+        } catch (e: any) { set({ error: e.message }); }
     },
 }));
