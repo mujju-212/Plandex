@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import FAB from '../../src/components/common/FAB';
 import Sidebar from '../../src/components/common/Sidebar';
@@ -39,56 +39,69 @@ export default function HomeTab() {
   const { logs, loadRecentLogs } = useLogStore();
   const { totalXP, currentLevel, levelTitle, currentStreak, loadStats } = useGamificationStore();
 
-  // Load all data on mount
-  useEffect(() => {
-    loadTodos();
-    loadHabits();
-    loadTodayCompletions();
-    loadEvents();
-    loadGoals();
-    loadRecentLogs(7);
-    loadStats();
-  }, []);
-
   // Reload on focus
   useFocusEffect(
     useCallback(() => {
-      AsyncStorage.getItem('profile_name').then(name => {
-        if (name) setUserName(name);
-      });
-      loadTodos();
-      loadHabits();
-      loadTodayCompletions();
-      loadEvents();
-      loadGoals();
-      loadRecentLogs(7);
-      loadStats();
-    }, [])
+      let active = true;
+
+      const loadDashboard = async () => {
+        const [name] = await Promise.all([
+          AsyncStorage.getItem('profile_name'),
+          loadTodos(),
+          loadHabits(),
+          loadTodayCompletions(),
+          loadEvents(),
+          loadGoals(),
+          loadRecentLogs(7),
+          loadStats(),
+        ]);
+
+        if (active && name) {
+          setUserName(name);
+        }
+      };
+
+      loadDashboard();
+
+      return () => {
+        active = false;
+      };
+    }, [loadEvents, loadGoals, loadHabits, loadRecentLogs, loadStats, loadTodayCompletions, loadTodos])
   );
 
   // Computed values
-  const today = new Date().toISOString().split('T')[0];
-  const pendingTodos = todos.filter(t => t.status !== 'completed');
+  const todayDate = new Date();
+  const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+  const pendingTodos = useMemo(() => todos.filter(t => t.status !== 'completed'), [todos]);
   const pendingCount = pendingTodos.length;
   const completedCount = todos.length - pendingCount;
-  const todaysTodos = todos.slice(0, 5); // Show up to 5 on dashboard
+  const todaysTodos = useMemo(() => todos.slice(0, 5), [todos]); // Show up to 5 on dashboard
 
-  const activeHabits = habits.filter(h => h.is_active);
-  const todayCompletedHabitIds = new Set(todayCompletions.filter(c => c.date === today).map(c => c.habit_id));
-  const habitsCompletedCount = activeHabits.filter(h => todayCompletedHabitIds.has(h.id)).length;
+  const activeHabits = useMemo(() => habits.filter(h => h.is_active), [habits]);
+  const todayCompletedHabitIds = useMemo(
+    () => new Set(todayCompletions.filter(c => c.date === today).map(c => c.habit_id)),
+    [today, todayCompletions]
+  );
+  const habitsCompletedCount = useMemo(
+    () => activeHabits.filter(h => todayCompletedHabitIds.has(h.id)).length,
+    [activeHabits, todayCompletedHabitIds]
+  );
 
-  const todayEvents = events.filter(e => {
+  const todayEvents = useMemo(() => events.filter(e => {
     try { return e.start_datetime.startsWith(today) && e.status !== 'cancelled'; }
     catch { return false; }
-  });
+  }), [events, today]);
 
-  const activeGoals = goals.filter(g => g.status === 'in_progress' || g.status === 'not_started');
+  const activeGoals = useMemo(
+    () => goals.filter(g => g.status === 'in_progress' || g.status === 'not_started'),
+    [goals]
+  );
 
-  const hasLoggedToday = logs.some(l => {
+  const hasLoggedToday = useMemo(() => logs.some(l => {
     if (l.date !== today) return false;
     // Only count as "done" if user actually wrote something
     return !!(l.what_i_did || l.achievements || l.learnings || l.challenges || l.tomorrow_intention || l.gratitude || l.overall_rating);
-  });
+  }), [logs, today]);
 
   // Cancel or reschedule the 10:30 PM daily-log reminder based on whether user logged today
   useEffect(() => {
@@ -99,7 +112,10 @@ export default function HomeTab() {
     }
   }, [hasLoggedToday]);
 
-  const productivityScore = todos.length > 0 ? Math.round((completedCount / todos.length) * 100) : 0;
+  const productivityScore = useMemo(
+    () => (todos.length > 0 ? Math.round((completedCount / todos.length) * 100) : 0),
+    [completedCount, todos.length]
+  );
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
