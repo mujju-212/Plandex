@@ -22,6 +22,14 @@ const CATEGORIES: { label: string; value: EventCategory; icon: string; color: st
 
 const EVENT_COLORS = ['#1A73E8', '#E91E63', '#4CAF50', '#FF9800', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B'];
 
+const formatDisplayTime = (value: string) => {
+  const [hours, minutes] = value.split(':').map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return value;
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return format(date, 'h:mm a');
+};
+
 export default function EditEventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -180,7 +188,7 @@ export default function EditEventScreen() {
               <input type="time" value={startTime} onChange={(e: any) => setStartTime(e.target.value)} style={{ width: 100, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'center', outline: 'none', fontFamily: 'inherit' } as any} />
             ) : (
               <Pressable onPress={() => { const [h, m] = startTime.split(':'); const d = new Date(); d.setHours(parseInt(h), parseInt(m)); setTempDate(d); setShowStartTimePicker(true); }} style={{ width: 70 }}>
-                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background, textAlign: 'center' }]}>{startTime}</Text>
+                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background, textAlign: 'center' }]}>{formatDisplayTime(startTime)}</Text>
               </Pressable>
             ))}
           </View>
@@ -199,7 +207,7 @@ export default function EditEventScreen() {
               <input type="time" value={endTime} onChange={(e: any) => setEndTime(e.target.value)} style={{ width: 100, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'center', outline: 'none', fontFamily: 'inherit' } as any} />
             ) : (
               <Pressable onPress={() => { const [h, m] = endTime.split(':'); const d = new Date(); d.setHours(parseInt(h), parseInt(m)); setTempDate(d); setShowEndTimePicker(true); }} style={{ width: 70 }}>
-                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background, textAlign: 'center' }]}>{endTime}</Text>
+                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background, textAlign: 'center' }]}>{formatDisplayTime(endTime)}</Text>
               </Pressable>
             ))}
           </View>
