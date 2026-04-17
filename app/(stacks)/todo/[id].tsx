@@ -32,6 +32,16 @@ export default function TodoDetailScreen() {
     }
   };
 
+  const getRecurringSummary = (item: Todo) => {
+    if (!item.is_recurring) return 'No';
+
+    const base = item.recurring_type ? item.recurring_type : 'yes';
+    const interval = item.recurring_interval ? `every ${item.recurring_interval}` : null;
+    const end = item.recurring_end_date ? `until ${item.recurring_end_date}` : null;
+
+    return [base, interval, end].filter(Boolean).join(' · ');
+  };
+
   if (!todo) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: tc.background }]}>
@@ -98,7 +108,12 @@ export default function TodoDetailScreen() {
           <View style={[styles.metaCard, { backgroundColor: tc.cardBackground }]}>
             <MaterialIcons name="repeat" size={18} color={tc.primary} />
             <Text style={[styles.metaLabel, { color: tc.textSecondary }]}>Recurring</Text>
-            <Text style={[styles.metaValue, { color: tc.textPrimary }]}>{todo.is_recurring ? 'Yes' : 'No'}</Text>
+            <Text style={[styles.metaValue, { color: tc.textPrimary }]}>{getRecurringSummary(todo)}</Text>
+          </View>
+          <View style={[styles.metaCard, { backgroundColor: tc.cardBackground }]}>
+            <MaterialIcons name="notifications" size={18} color={tc.primary} />
+            <Text style={[styles.metaLabel, { color: tc.textSecondary }]}>Reminder</Text>
+            <Text style={[styles.metaValue, { color: tc.textPrimary }]}>{todo.reminder_enabled ? 'On' : 'Off'}</Text>
           </View>
         </View>
 

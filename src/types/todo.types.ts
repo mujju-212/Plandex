@@ -1,6 +1,7 @@
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'archived';
 export type DateType = 'none' | 'single' | 'range' | 'week' | 'month';
+export type RecurringType = 'daily' | 'weekly' | 'monthly';
 
 export interface Todo {
     id: number;
@@ -13,12 +14,32 @@ export interface Todo {
     start_date: string | null;
     end_date: string | null;
     due_time: string | null;
+    reminder_enabled: boolean;
     is_recurring: boolean;
+    recurring_type: RecurringType | null;
+    recurring_interval: number | null;
+    recurring_end_date: string | null;
     tags: string[]; // Stored as JSON string
     position: number;
     created_at: string;
     updated_at: string;
     completed_at: string | null;
+}
+
+export interface TodoList {
+    id: number;
+    name: string;
+    color: string;
+    icon: string;
+    position: number;
+    is_default: boolean;
+    created_at: string;
+}
+
+export interface CreateTodoListInput {
+    name: string;
+    color?: string;
+    icon?: string;
 }
 
 export interface CreateTodoInput {
@@ -30,7 +51,11 @@ export interface CreateTodoInput {
     start_date?: string;
     end_date?: string;
     due_time?: string;
+    reminder_enabled?: boolean;
     is_recurring?: boolean;
+    recurring_type?: RecurringType;
+    recurring_interval?: number;
+    recurring_end_date?: string;
     tags?: string[];
     position?: number;
 }
@@ -45,6 +70,11 @@ export interface UpdateTodoInput {
     start_date?: string;
     end_date?: string;
     due_time?: string;
+    reminder_enabled?: boolean;
+    is_recurring?: boolean;
+    recurring_type?: RecurringType;
+    recurring_interval?: number;
+    recurring_end_date?: string;
     tags?: string[];
     position?: number;
 }

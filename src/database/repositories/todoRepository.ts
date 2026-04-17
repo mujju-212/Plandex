@@ -1,11 +1,114 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { CreateTodoInput, Todo, TodoFilter, UpdateTodoInput } from '../../types/todo.types';
+import { CreateTodoInput, CreateTodoListInput, Todo, TodoFilter, TodoList, UpdateTodoInput } from '../../types/todo.types';
 import { getDB } from '../database';
 
 const TODOS_STORAGE_KEY = 'myplanner_todos';
+const TODO_LISTS_STORAGE_KEY = 'myplanner_todo_lists';
 
 class TodoRepository {
+    private async getWebTodoLists(): Promise<TodoList[]> {
+        try {
+            const data = await AsyncStorage.getItem(TODO_LISTS_STORAGE_KEY);
+            if (data) return JSON.parse(data);
+        } catch (error) {
+            console.error('Failed to parse web todo lists', error);
+        }
+        return [];
+    }
+
+    private async setWebTodoLists(lists: TodoList[]): Promise<void> {
+        try {
+            await AsyncStorage.setItem(TODO_LISTS_STORAGE_KEY, JSON.stringify(lists));
+        } catch (error) {
+            console.error('Failed to save web todo lists', error);
+        }
+    }
+
+    private async ensureDefaultWebTodoLists(): Promise<TodoList[]> {
+        const lists = await this.getWebTodoLists();
+        if (lists.length > 0) return lists;
+
+        const defaultList: TodoList = {
+            id: Date.now(),
+            name: 'General',
+            color: '#1A73E8',
+            icon: 'playlist-check',
+            position: 0,
+            is_default: true,
+            created_at: new Date().toISOString(),
+        };
+
+        await this.setWebTodoLists([defaultList]);
+        return [defaultList];
+    }
+
+    async getLists(): Promise<TodoList[]> {
+        if (Platform.OS === 'web') {
+            const lists = await this.ensureDefaultWebTodoLists();
+            return lists.sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+        }
+
+        const db = getDB();
+        let rows = await db.getAllAsync('SELECT * FROM todo_lists ORDER BY position ASC, name ASC');
+        if (rows.length === 0) {
+            await db.runAsync(
+                'INSERT INTO todo_lists (name, color, icon, position, is_default) VALUES (?, ?, ?, 0, 1)',
+                ['General', '#1A73E8', 'playlist-check']
+            );
+            rows = await db.getAllAsync('SELECT * FROM todo_lists ORDER BY position ASC, name ASC');
+        }
+        return rows.map((row: any) => ({ ...row, is_default: !!row.is_default }));
+    }
+
+    async createList(input: CreateTodoListInput): Promise<TodoList> {
+        const name = input.name.trim();
+        if (!name) throw new Error('Category name is required');
+
+        if (Platform.OS === 'web') {
+            const lists = await this.ensureDefaultWebTodoLists();
+            const existing = lists.find(l => l.name.trim().toLowerCase() === name.toLowerCase());
+            if (existing) return existing;
+
+            const nextPosition = lists.length > 0 ? Math.max(...lists.map(l => l.position)) + 1 : 0;
+            const newList: TodoList = {
+                id: Date.now(),
+                name,
+                color: input.color || '#1A73E8',
+                icon: input.icon || 'playlist-check',
+                position: nextPosition,
+                is_default: false,
+                created_at: new Date().toISOString(),
+            };
+
+            await this.setWebTodoLists([...lists, newList]);
+            return newList;
+        }
+
+        const db = getDB();
+        const duplicate = await db.getFirstAsync('SELECT id FROM todo_lists WHERE LOWER(name) = LOWER(?)', [name]);
+        if (duplicate) {
+            const existing = await db.getFirstAsync('SELECT * FROM todo_lists WHERE id = ?', [(duplicate as any).id]);
+            return { ...(existing as any), is_default: !!(existing as any).is_default };
+        }
+
+        const maxPosRows = await db.getAllAsync<{ maxPos: number }>('SELECT COALESCE(MAX(position), -1) as maxPos FROM todo_lists');
+        const nextPosition = (maxPosRows[0]?.maxPos ?? -1) + 1;
+
+        const result = await db.runAsync(
+            'INSERT INTO todo_lists (name, color, icon, position, is_default) VALUES (?, ?, ?, ?, 0)',
+            [name, input.color || '#1A73E8', input.icon || 'playlist-check', nextPosition]
+        );
+        const row = await db.getFirstAsync('SELECT * FROM todo_lists WHERE id = ?', [result.lastInsertRowId]);
+        return { ...(row as any), is_default: !!(row as any).is_default };
+    }
+
+    private async getDefaultListId(): Promise<number | null> {
+        const lists = await this.getLists();
+        const defaultList = lists.find(l => l.is_default) || lists[0];
+        return defaultList?.id ?? null;
+    }
+
     private async getWebTodos(): Promise<Todo[]> {
         try {
             const data = await AsyncStorage.getItem(TODOS_STORAGE_KEY);
@@ -27,19 +130,25 @@ class TodoRepository {
     async insert(todo: CreateTodoInput): Promise<Todo> {
         const timestamp = new Date().toISOString();
         if (Platform.OS === 'web') {
+            const lists = await this.ensureDefaultWebTodoLists();
+            const defaultListId = lists.find(l => l.is_default)?.id ?? lists[0]?.id ?? null;
             const todos = await this.getWebTodos();
             const newTodo: Todo = {
                 id: Date.now(),
                 title: todo.title,
                 description: todo.description || null,
-                list_id: todo.list_id || null,
+                list_id: todo.list_id ?? defaultListId,
                 priority: todo.priority || 'medium',
                 status: 'pending',
                 date_type: todo.date_type || 'none',
                 start_date: todo.start_date || null,
                 end_date: todo.end_date || null,
                 due_time: todo.due_time || null,
+                reminder_enabled: todo.reminder_enabled || false,
                 is_recurring: todo.is_recurring || false,
+                recurring_type: todo.recurring_type || null,
+                recurring_interval: todo.recurring_interval ?? null,
+                recurring_end_date: todo.recurring_end_date || null,
                 tags: todo.tags || [],
                 position: todo.position || 0,
                 created_at: timestamp,
@@ -53,22 +162,29 @@ class TodoRepository {
 
         const db = getDB();
         const tagsJson = JSON.stringify(todo.tags || []);
+        const resolvedListId = todo.list_id ?? await this.getDefaultListId();
 
         const result = await db.runAsync(
             `INSERT INTO todos (
         title, description, list_id, priority, date_type, 
-        start_date, end_date, due_time, is_recurring, tags, position
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                start_date, end_date, due_time, reminder_enabled, is_recurring,
+        recurring_type, recurring_interval, recurring_end_date,
+        tags, position
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 todo.title,
                 todo.description || null,
-                todo.list_id || null,
+                resolvedListId,
                 todo.priority || 'medium',
                 todo.date_type || 'none',
                 todo.start_date || null,
                 todo.end_date || null,
                 todo.due_time || null,
+                todo.reminder_enabled ? 1 : 0,
                 todo.is_recurring ? 1 : 0,
+                todo.recurring_type || null,
+                todo.recurring_interval ?? null,
+                todo.recurring_end_date || null,
                 tagsJson,
                 todo.position || 0
             ]
@@ -95,6 +211,7 @@ class TodoRepository {
             if (filter) {
                 if (filter.status) todos = todos.filter(t => t.status === filter.status);
                 if (filter.priority) todos = todos.filter(t => t.priority === filter.priority);
+                if (filter.list_id !== undefined) todos = todos.filter(t => t.list_id === filter.list_id);
                 if (filter.date) todos = todos.filter(t => t.start_date === filter.date || t.date_type === 'none');
                 if (filter.exclude_archived) todos = todos.filter(t => t.status !== 'archived');
             }
@@ -122,6 +239,10 @@ class TodoRepository {
             if (filter.priority) {
                 query += ' AND priority = ?';
                 params.push(filter.priority);
+            }
+            if (filter.list_id !== undefined) {
+                query += ' AND list_id = ?';
+                params.push(filter.list_id);
             }
             if (filter.date) {
                 query += ' AND (start_date = ? OR date_type = "none")';
@@ -163,7 +284,9 @@ class TodoRepository {
         const ALLOWED_COLUMNS = new Set([
             'title', 'description', 'list_id', 'priority', 'status',
             'date_type', 'start_date', 'end_date', 'due_time',
-            'is_recurring', 'tags', 'position',
+            'reminder_enabled',
+            'is_recurring', 'recurring_type', 'recurring_interval', 'recurring_end_date',
+            'tags', 'position',
         ]);
 
         const mappedInput: any = { ...input };
@@ -172,6 +295,9 @@ class TodoRepository {
         }
         if (mappedInput.is_recurring !== undefined) {
             mappedInput.is_recurring = mappedInput.is_recurring ? 1 : 0;
+        }
+        if (mappedInput.reminder_enabled !== undefined) {
+            mappedInput.reminder_enabled = mappedInput.reminder_enabled ? 1 : 0;
         }
 
         const keys = Object.keys(mappedInput).filter(k => ALLOWED_COLUMNS.has(k));
@@ -231,7 +357,11 @@ class TodoRepository {
         }
         return {
             ...row,
+            reminder_enabled: Boolean(row.reminder_enabled),
             is_recurring: Boolean(row.is_recurring),
+            recurring_type: row.recurring_type || null,
+            recurring_interval: row.recurring_interval ?? null,
+            recurring_end_date: row.recurring_end_date || null,
             tags,
         };
     }

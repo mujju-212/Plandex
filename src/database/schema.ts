@@ -37,7 +37,11 @@ export const initializeDatabase = async () => {
         start_date TEXT,
         end_date TEXT,
         due_time TEXT,
+        reminder_enabled BOOLEAN DEFAULT 0,
         is_recurring BOOLEAN DEFAULT 0,
+        recurring_type TEXT,
+        recurring_interval INTEGER,
+        recurring_end_date TEXT,
         tags TEXT DEFAULT '[]',
         position INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -293,6 +297,23 @@ export const initializeDatabase = async () => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    // Migration: ensure todo recurrence detail columns exist for older databases.
+    const todoCols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(todos);');
+    const todoColNames = new Set(todoCols.map((c) => c.name));
+
+    if (!todoColNames.has('recurring_type')) {
+      await db.execAsync('ALTER TABLE todos ADD COLUMN recurring_type TEXT;');
+    }
+    if (!todoColNames.has('recurring_interval')) {
+      await db.execAsync('ALTER TABLE todos ADD COLUMN recurring_interval INTEGER;');
+    }
+    if (!todoColNames.has('recurring_end_date')) {
+      await db.execAsync('ALTER TABLE todos ADD COLUMN recurring_end_date TEXT;');
+    }
+    if (!todoColNames.has('reminder_enabled')) {
+      await db.execAsync('ALTER TABLE todos ADD COLUMN reminder_enabled BOOLEAN DEFAULT 0;');
+    }
 
     // Ensure at least one stats row exists for gamification/tracking
     const statsRow = await db.getAllAsync<{ count: number }>('SELECT COUNT(*) as count FROM user_stats');

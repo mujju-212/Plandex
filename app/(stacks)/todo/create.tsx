@@ -3,7 +3,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { addDays, format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Card from '../../../src/components/common/Card';
 import PrioritySelector from '../../../src/components/common/PrioritySelector';
@@ -11,20 +11,24 @@ import { useThemeStore } from '../../../src/stores/useThemeStore';
 import { useTodoStore } from '../../../src/stores/useTodoStore';
 import { colors } from '../../../src/theme/colors';
 import { typography } from '../../../src/theme/typography';
+import { RecurringType as TodoRecurringType } from '../../../src/types/todo.types';
 
 type DateType = 'none' | 'single' | 'range';
-type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly';
 
 export default function CreateTodoScreen() {
   const router = useRouter();
   const { isDark, colors: tc } = useThemeStore();
-  const { addTodo } = useTodoStore();
+  const { addTodo, lists, loadTodoLists, addTodoList } = useTodoStore();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [tagInput, setTagInput] = useState('');
   const [reminder, setReminder] = useState(false);
+  const [selectedListId, setSelectedListId] = useState<number | null>(null);
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryColor, setNewCategoryColor] = useState('#1A73E8');
 
   // Date fields
   const [dateType, setDateType] = useState<DateType>('single');
@@ -41,9 +45,37 @@ export default function CreateTodoScreen() {
 
   // Recurring fields
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurringType, setRecurringType] = useState<RecurringType>('daily');
+  const [recurringType, setRecurringType] = useState<TodoRecurringType>('daily');
   const [recurringInterval, setRecurringInterval] = useState('1');
   const [recurringEndDate, setRecurringEndDate] = useState('');
+
+  useEffect(() => {
+    loadTodoLists();
+  }, [loadTodoLists]);
+
+  useEffect(() => {
+    if (!selectedListId && lists.length > 0) {
+      const defaultList = lists.find(list => list.is_default) || lists[0];
+      setSelectedListId(defaultList.id);
+    }
+  }, [lists, selectedListId]);
+
+  const handleCreateCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) {
+      Alert.alert('Error', 'Category name is required');
+      return;
+    }
+
+    try {
+      const list = await addTodoList(name, newCategoryColor, 'playlist-check');
+      setSelectedListId(list.id);
+      setNewCategoryName('');
+      setShowNewCategoryInput(false);
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to create category');
+    }
+  };
 
   const handleDateChange = (event: any, selectedDate?: Date, type?: 'start' | 'end' | 'time' | 'recurringEnd') => {
     if (Platform.OS === 'android') {
@@ -101,22 +133,28 @@ export default function CreateTodoScreen() {
 
     try {
       const tagsArr = tagInput.split(',').map(t => t.trim()).filter(Boolean);
-      const recurringPattern = isRecurring ? {
-        type: recurringType,
-        interval: parseInt(recurringInterval) || 1,
-        end_date: recurringEndDate || undefined,
-      } : undefined;
+      const parsedRecurringInterval = parseInt(recurringInterval, 10);
+      if (isRecurring && (!Number.isFinite(parsedRecurringInterval) || parsedRecurringInterval < 1)) {
+        Alert.alert('Error', 'Recurring interval must be at least 1');
+        return;
+      }
+      const normalizedRecurringInterval = isRecurring ? parsedRecurringInterval : undefined;
 
       await addTodo({
         title: title.trim(),
         description: description.trim() || undefined,
+        list_id: selectedListId || undefined,
         priority,
         date_type: dateType,
         start_date: dateType !== 'none' ? startDate : undefined,
         end_date: dateType === 'range' ? endDate : undefined,
         due_time: dueTime || undefined,
+        reminder_enabled: reminder,
         is_recurring: isRecurring,
-        tags: tagsArr.length > 0 ? tagsArr : ['General'],
+        recurring_type: isRecurring ? recurringType : undefined,
+        recurring_interval: normalizedRecurringInterval,
+        recurring_end_date: isRecurring && recurringEndDate ? recurringEndDate : undefined,
+        tags: tagsArr.length > 0 ? tagsArr : undefined,
       });
       router.back();
     } catch (e: any) {
@@ -130,11 +168,13 @@ export default function CreateTodoScreen() {
     { label: 'Date Range', value: 'range', icon: 'date-range' },
   ];
 
-  const recurringOptions: { label: string; value: RecurringType }[] = [
+  const recurringOptions: { label: string; value: TodoRecurringType }[] = [
     { label: 'Daily', value: 'daily' },
     { label: 'Weekly', value: 'weekly' },
     { label: 'Monthly', value: 'monthly' },
   ];
+
+  const categoryColors = ['#1A73E8', '#16A34A', '#D97706', '#DB2777', '#7C3AED', '#EA580C'];
 
   return (
     <View style={[styles.container, { backgroundColor: tc.background }]}>
@@ -154,7 +194,7 @@ export default function CreateTodoScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
         {/* Title & Description Card */}
-        <Card style={styles.inputCard}>
+        <Card style={styles.inputCard} withShadow={false}>
           <TextInput
             style={[styles.titleInput, { color: tc.textPrimary }]}
             placeholder="Task title"
@@ -172,6 +212,76 @@ export default function CreateTodoScreen() {
             multiline
             textAlignVertical="top"
           />
+        </Card>
+
+        {/* Category */}
+        <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>Category</Text>
+        <Card style={styles.inputCard} withShadow={false}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+            {lists.map((list) => (
+              <Pressable
+                key={list.id}
+                style={[
+                  styles.categoryChip,
+                  { backgroundColor: tc.background, borderColor: tc.border },
+                  selectedListId === list.id && { backgroundColor: tc.primary, borderColor: tc.primary },
+                ]}
+                onPress={() => setSelectedListId(list.id)}
+              >
+                <View style={[styles.categoryDot, { backgroundColor: selectedListId === list.id ? '#FFFFFF' : list.color }]} />
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    { color: tc.textSecondary },
+                    selectedListId === list.id && { color: '#FFFFFF' },
+                  ]}
+                >
+                  {list.name}
+                </Text>
+              </Pressable>
+            ))}
+
+            <Pressable
+              style={[styles.addCategoryChip, { backgroundColor: tc.cardBackground, borderColor: tc.border }]}
+              onPress={() => setShowNewCategoryInput(v => !v)}
+            >
+              <MaterialIcons name={showNewCategoryInput ? 'close' : 'add'} size={16} color={tc.primary} />
+              <Text style={[styles.addCategoryText, { color: tc.primary }]}>{showNewCategoryInput ? 'Cancel' : 'New'}</Text>
+            </Pressable>
+          </ScrollView>
+
+          {showNewCategoryInput && (
+            <>
+              <View style={[styles.divider, { backgroundColor: tc.border, marginLeft: 0 }]} />
+              <View style={styles.newCategoryBox}>
+                <TextInput
+                  style={[styles.newCategoryInput, { color: tc.textPrimary, borderColor: tc.border, backgroundColor: tc.background }]}
+                  placeholder="Category name"
+                  placeholderTextColor={tc.textSecondary}
+                  value={newCategoryName}
+                  onChangeText={setNewCategoryName}
+                />
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPickerRow}>
+                  {categoryColors.map((color) => (
+                    <Pressable
+                      key={color}
+                      style={[
+                        styles.colorDot,
+                        { backgroundColor: color },
+                        newCategoryColor === color && { borderColor: tc.textPrimary, borderWidth: 2 },
+                      ]}
+                      onPress={() => setNewCategoryColor(color)}
+                    />
+                  ))}
+                </ScrollView>
+
+                <Pressable style={[styles.createCategoryBtn, { backgroundColor: tc.primary }]} onPress={handleCreateCategory}>
+                  <Text style={styles.createCategoryText}>Create Category</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
         </Card>
 
         {/* Date Type Selector */}
@@ -193,7 +303,7 @@ export default function CreateTodoScreen() {
 
         {/* Date Inputs */}
         {dateType !== 'none' && (
-          <Card style={styles.inputCard}>
+          <Card style={styles.inputCard} withShadow={false}>
             <View style={styles.fieldRow}>
               <MaterialIcons name="calendar-today" size={20} color={tc.primary} />
               <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>{dateType === 'range' ? 'Start Date' : 'Date'}</Text>
@@ -261,7 +371,7 @@ export default function CreateTodoScreen() {
 
         {/* Priority */}
         <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>Priority</Text>
-        <Card style={styles.inputCard}>
+        <Card style={styles.inputCard} withShadow={false}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.fieldRow}>
             <PrioritySelector selected={priority} onSelect={setPriority} />
           </ScrollView>
@@ -269,7 +379,7 @@ export default function CreateTodoScreen() {
 
         {/* Recurring */}
         <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>Recurring</Text>
-        <Card style={styles.inputCard}>
+        <Card style={styles.inputCard} withShadow={false}>
           <View style={styles.fieldRow}>
             <MaterialIcons name="repeat" size={20} color={tc.primary} />
             <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Repeat</Text>
@@ -341,7 +451,7 @@ export default function CreateTodoScreen() {
 
         {/* Tags */}
         <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>Tags</Text>
-        <Card style={styles.inputCard}>
+        <Card style={styles.inputCard} withShadow={false}>
           <View style={styles.fieldRow}>
             <MaterialIcons name="label" size={20} color={tc.primary} />
             <TextInput
@@ -355,7 +465,7 @@ export default function CreateTodoScreen() {
         </Card>
 
         {/* Reminder */}
-        <Card style={[styles.inputCard, { marginTop: 12 }]}>
+        <Card style={[styles.inputCard, { marginTop: 12 }]} withShadow={false}>
           <View style={styles.fieldRow}>
             <MaterialIcons name="notifications" size={20} color={tc.warning} />
             <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Reminder</Text>
@@ -374,7 +484,7 @@ export default function CreateTodoScreen() {
 
       {/* Bottom Save Button */}
       <View style={styles.bottomContainer}>
-        <Pressable style={styles.mainSaveBtn} onPress={handleSave}>
+        <Pressable onPress={handleSave}>
           <LinearGradient
             colors={[tc.gradientStart, tc.gradientEnd]}
             style={styles.mainSaveGradient}
@@ -459,6 +569,34 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.border, marginLeft: 16 },
   descInput: { padding: 16, height: 80, fontSize: typography.sizes.md, color: colors.textPrimary },
 
+  categoryRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingVertical: 10, paddingRight: 20 },
+  categoryChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  categoryDot: { width: 9, height: 9, borderRadius: 5 },
+  categoryChipText: { fontSize: typography.sizes.sm, fontWeight: typography.weights.medium as any },
+  addCategoryChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  addCategoryText: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any },
+  newCategoryBox: { padding: 12, gap: 12 },
+  newCategoryInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: typography.sizes.md,
+  },
+  colorPickerRow: { flexDirection: 'row', gap: 8, paddingVertical: 2 },
+  colorDot: { width: 26, height: 26, borderRadius: 13 },
+  createCategoryBtn: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18 },
+  createCategoryText: { color: '#FFFFFF', fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any },
+
   chipRow: { flexDirection: 'row', gap: 8, paddingBottom: 8, paddingRight: 20 },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -489,10 +627,6 @@ const styles = StyleSheet.create({
   miniChipTextActive: { color: '#FFF' },
 
   bottomContainer: { position: 'absolute', bottom: 32, left: 20, right: 20 },
-  mainSaveBtn: {
-    shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 10, elevation: 8,
-  },
   mainSaveGradient: { paddingVertical: 16, borderRadius: 30, alignItems: 'center' },
   mainSaveText: { color: colors.textWhite, fontSize: typography.sizes.xl, fontWeight: typography.weights.bold as any },
 });

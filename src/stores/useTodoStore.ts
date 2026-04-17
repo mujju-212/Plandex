@@ -1,16 +1,19 @@
 import { create } from 'zustand';
 import { scheduleTodoReminder } from '../services/notificationService';
 import { todoService } from '../services/todoService';
-import { CreateTodoInput, Todo, TodoFilter, UpdateTodoInput } from '../types/todo.types';
+import { CreateTodoInput, Todo, TodoFilter, TodoList, UpdateTodoInput } from '../types/todo.types';
 
 interface TodoState {
     todos: Todo[];
+    lists: TodoList[];
     selectedTodo: Todo | null;
     isLoading: boolean;
     error: string | null;
     filter: TodoFilter;
 
     // Actions
+    loadTodoLists: () => Promise<void>;
+    addTodoList: (name: string, color?: string, icon?: string) => Promise<TodoList>;
     loadTodos: (filter?: TodoFilter) => Promise<void>;
     loadTodosForDate: (date: string) => Promise<void>;
     addTodo: (input: CreateTodoInput) => Promise<Todo>;
@@ -26,10 +29,34 @@ interface TodoState {
 
 export const useTodoStore = create<TodoState>((set, get) => ({
     todos: [],
+    lists: [],
     selectedTodo: null,
     isLoading: false,
     error: null,
     filter: {},
+
+    loadTodoLists: async () => {
+        try {
+            set({ error: null });
+            const lists = await todoService.getTodoLists();
+            set({ lists });
+        } catch (error: any) {
+            set({ error: error.message });
+        }
+    },
+
+    addTodoList: async (name: string, color?: string, icon?: string) => {
+        try {
+            set({ error: null });
+            const list = await todoService.createTodoList({ name, color, icon });
+            const lists = await todoService.getTodoLists();
+            set({ lists });
+            return list;
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
 
     loadTodos: async (filter?: TodoFilter) => {
         try {
@@ -56,8 +83,8 @@ export const useTodoStore = create<TodoState>((set, get) => ({
         try {
             set({ error: null });
             const todo = await todoService.createTodo(input);
-            // Schedule notification if todo has a due date
-            if (todo.start_date) {
+            // Schedule notification only when reminder is enabled and todo has a date.
+            if (todo.reminder_enabled && todo.start_date) {
                 scheduleTodoReminder(todo.id, todo.title, todo.start_date, todo.due_time || undefined).catch(() => {});
             }
             set(state => ({ todos: [todo, ...state.todos] }));
