@@ -1,5 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -22,6 +23,16 @@ const CATEGORIES: { label: string; value: HabitCategory; icon: string; color: st
 
 const HABIT_COLORS = ['#00BFA5', '#2196F3', '#E91E63', '#FF9800', '#9C27B0', '#4CAF50', '#FF5722', '#607D8B'];
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const formatDisplayTime = (value: string) => {
+  if (!value) return 'Optional';
+  const [hours, minutes] = value.split(':').map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return value;
+
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  return format(date, 'h:mm a');
+};
 
 export default function EditHabitScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -169,7 +180,7 @@ export default function EditHabitScreen() {
             ) : (
               <Pressable onPress={() => { if (reminderTime) { const [h, m] = reminderTime.split(':'); const d = new Date(); d.setHours(parseInt(h), parseInt(m)); setTempDate(d); } else { setTempDate(new Date()); } setShowTimePicker(true); }} style={{ flex: 1 }}>
                 <Text style={[styles.fieldInput, { color: reminderTime ? tc.textPrimary : tc.textSecondary, backgroundColor: tc.background }]}>
-                  {reminderTime || 'Optional'}
+                  {formatDisplayTime(reminderTime)}
                 </Text>
               </Pressable>
             )}
