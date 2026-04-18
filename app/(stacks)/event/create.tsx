@@ -121,7 +121,7 @@ export default function CreateEventScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Title & Desc */}
-        <Card style={styles.inputCard}>
+        <Card style={styles.inputCard} withShadow={false}>
           <TextInput style={[styles.titleInput, { color: tc.textPrimary }]} placeholder="Event title" placeholderTextColor={tc.textSecondary} value={title} onChangeText={setTitle} />
           <View style={[styles.divider, { backgroundColor: tc.border }]} />
           <TextInput style={[styles.descInput, { color: tc.textPrimary }]} placeholder="Description (optional)" placeholderTextColor={tc.textSecondary} value={description} onChangeText={setDescription} multiline textAlignVertical="top" />
@@ -148,7 +148,7 @@ export default function CreateEventScreen() {
 
         {/* Date & Time */}
         <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>Date & Time</Text>
-        <Card style={styles.inputCard}>
+        <Card style={styles.inputCard} withShadow={false}>
           <View style={styles.fieldRow}>
             <MaterialIcons name="wb-sunny" size={20} color={tc.primary} />
             <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>All Day</Text>
@@ -204,7 +204,7 @@ export default function CreateEventScreen() {
 
         {/* Location */}
         <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>Location</Text>
-        <Card style={styles.inputCard}>
+        <Card style={styles.inputCard} withShadow={false}>
           <View style={styles.fieldRow}>
             <MaterialIcons name="location-on" size={20} color={tc.danger} />
             <TextInput style={[styles.fieldInput, { flex: 1, color: tc.textPrimary, backgroundColor: tc.background }]} value={location} onChangeText={setLocation} placeholder="Add location..." placeholderTextColor={tc.textSecondary} />
@@ -213,7 +213,7 @@ export default function CreateEventScreen() {
 
         {/* Recurring */}
         <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>Recurring</Text>
-        <Card style={styles.inputCard}>
+        <Card style={styles.inputCard} withShadow={false}>
           <View style={styles.fieldRow}>
             <MaterialIcons name="repeat" size={20} color={tc.primary} />
             <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Repeat</Text>
@@ -275,7 +275,7 @@ export default function CreateEventScreen() {
       )}
 
       <View style={styles.bottomContainer}>
-        <Pressable style={styles.mainSaveBtn} onPress={handleSave}>
+        <Pressable onPress={handleSave}>
           <LinearGradient colors={[tc.gradientStart, tc.gradientEnd]} style={styles.mainSaveGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
             <Text style={styles.mainSaveText}>Create Event</Text>
           </LinearGradient>
@@ -311,7 +311,6 @@ const styles = StyleSheet.create({
   miniChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
   miniChipText: { fontSize: typography.sizes.xs, color: colors.textSecondary, fontWeight: typography.weights.medium as any },
   bottomContainer: { position: 'absolute', bottom: 32, left: 20, right: 20 },
-  mainSaveBtn: { shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 },
   mainSaveGradient: { paddingVertical: 16, borderRadius: 30, alignItems: 'center' as const },
   mainSaveText: { color: colors.textWhite, fontSize: typography.sizes.xl, fontWeight: typography.weights.bold as any },
 });

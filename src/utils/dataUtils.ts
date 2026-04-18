@@ -19,8 +19,21 @@ const ASYNC_KEYS = [
   'app_settings',
   'user_profile',
   'profile_name',
+  'profile_profession',
   'profile_photo_uri',
 ];
+
+function parseAsyncValue(raw: string): any {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function stringifyAsyncValue(value: any): string {
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
 
 // SQLite table names (order matters — children before parents for import)
 const SQLITE_TABLES = [
@@ -105,7 +118,7 @@ export async function exportAllData(): Promise<string> {
     for (const key of ASYNC_KEYS) {
       try {
         const raw = await AsyncStorage.getItem(key);
-        if (raw) data[key] = JSON.parse(raw);
+        if (raw !== null) data[key] = parseAsyncValue(raw);
       } catch { }
     }
   } else {
@@ -122,7 +135,7 @@ export async function exportAllData(): Promise<string> {
     for (const key of ASYNC_KEYS) {
       try {
         const raw = await AsyncStorage.getItem(key);
-        if (raw) data[`async_${key}`] = JSON.parse(raw);
+        if (raw !== null) data[`async_${key}`] = parseAsyncValue(raw);
       } catch { }
     }
   }
@@ -158,7 +171,7 @@ export async function importAllData(jsonString: string): Promise<void> {
     for (const key of ASYNC_KEYS) {
       const value = data[key] ?? data[`async_${key}`];
       if (value !== undefined) {
-        await AsyncStorage.setItem(key, JSON.stringify(value));
+        await AsyncStorage.setItem(key, stringifyAsyncValue(value));
       }
     }
     // If source was native-exported, also import SQLite arrays into AsyncStorage
@@ -222,7 +235,7 @@ export async function importAllData(jsonString: string): Promise<void> {
     for (const key of ASYNC_KEYS) {
       const value = data[`async_${key}`] ?? data[key];
       if (value !== undefined) {
-        await AsyncStorage.setItem(key, JSON.stringify(value));
+        await AsyncStorage.setItem(key, stringifyAsyncValue(value));
       }
     }
   }

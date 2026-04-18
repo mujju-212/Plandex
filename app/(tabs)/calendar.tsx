@@ -1,7 +1,7 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { addDays, addMonths, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek, subMonths } from 'date-fns';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import FAB from '../../src/components/common/FAB';
 import Sidebar from '../../src/components/common/Sidebar';
@@ -25,11 +25,21 @@ export default function CalendarTab() {
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     loadTodos();
     loadLogs();
     loadEvents();
-  }, []);
+  }, [loadTodos, loadLogs, loadEvents]));
+
+  const getDatePart = (datetime: string | null | undefined) => (datetime || '').slice(0, 10);
+  const getTimePart = (datetime: string | null | undefined) => {
+    if (!datetime) return '';
+    const isoIndex = datetime.indexOf('T');
+    if (isoIndex >= 0) return datetime.slice(isoIndex + 1, isoIndex + 6);
+    const spaceIndex = datetime.indexOf(' ');
+    if (spaceIndex >= 0) return datetime.slice(spaceIndex + 1, spaceIndex + 6);
+    return '';
+  };
 
   const goToPrevMonth = () => setCurrentMonth(prev => subMonths(prev, 1));
   const goToNextMonth = () => setCurrentMonth(prev => addMonths(prev, 1));
@@ -54,8 +64,8 @@ export default function CalendarTab() {
     const hasLog = logs.some(l => l.date === dateStr);
     const hasCompleted = todos.some(t => (t.start_date === dateStr) && t.status === 'completed');
     const hasEvents = events.some(e => {
-      const startDate = e.start_datetime.split('T')[0];
-      const endDate = e.end_datetime ? e.end_datetime.split('T')[0] : startDate;
+      const startDate = getDatePart(e.start_datetime);
+      const endDate = getDatePart(e.end_datetime) || startDate;
       return dateStr >= startDate && dateStr <= endDate;
     });
     return { hasTodos, hasLog, hasCompleted, hasEvents };
@@ -65,6 +75,12 @@ export default function CalendarTab() {
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
   const selectedTodos = todos.filter(t => t.start_date === selectedDateStr || (t.date_type === 'none'));
   const selectedLog = logs.find(l => l.date === selectedDateStr);
+  const selectedEvents = events.filter(e => {
+    if (e.status === 'cancelled') return false;
+    const startDate = getDatePart(e.start_datetime);
+    const endDate = getDatePart(e.end_datetime) || startDate;
+    return selectedDateStr >= startDate && selectedDateStr <= endDate;
+  });
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tc.background }]}>
@@ -176,18 +192,13 @@ export default function CalendarTab() {
             )}
 
             {/* Events for selected date */}
-            {events.filter(e => {
-              const sd = format(selectedDate, 'yyyy-MM-dd');
-              const eStart = e.start_datetime.split('T')[0];
-              const eEnd = e.end_datetime ? e.end_datetime.split('T')[0] : eStart;
-              return sd >= eStart && sd <= eEnd;
-            }).map(event => (
+            {selectedEvents.map(event => (
               <Pressable key={`ev-${event.id}`} style={[styles.eventCard, { backgroundColor: tc.cardBackground }]} onPress={() => router.push(`/event/${event.id}`)}>
                 <View style={[styles.eventIndicator, { backgroundColor: event.color }]} />
                 <View style={styles.eventCardContent}>
                   <Text style={[styles.eventTitle, { color: tc.textPrimary }]}>{event.title}</Text>
                   <Text style={[styles.eventMeta, { color: tc.textSecondary }]}>
-                    {event.category} • {event.is_all_day ? 'All day' : event.start_datetime.split('T')[1]?.slice(0, 5) || ''}
+                    {event.category} • {event.is_all_day ? 'All day' : getTimePart(event.start_datetime)}
                   </Text>
                 </View>
                 <MaterialIcons name="event" size={22} color={event.color} />

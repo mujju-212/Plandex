@@ -1,8 +1,24 @@
 import { todoRepository } from '../database/repositories/todoRepository';
-import { CreateTodoInput, Todo, TodoFilter, UpdateTodoInput } from '../types/todo.types';
+import { CreateTodoInput, CreateTodoListInput, Todo, TodoFilter, TodoList, UpdateTodoInput } from '../types/todo.types';
 import { gamificationService } from './gamificationService';
 
 class TodoService {
+    async getTodoLists(): Promise<TodoList[]> {
+        return todoRepository.getLists();
+    }
+
+    async createTodoList(input: CreateTodoListInput): Promise<TodoList> {
+        if (!input.name || input.name.trim() === '') {
+            throw new Error('Category name is required');
+        }
+
+        return todoRepository.createList({
+            name: input.name.trim(),
+            color: input.color,
+            icon: input.icon,
+        });
+    }
+
     async getTodos(filter?: TodoFilter): Promise<Todo[]> {
         return todoRepository.findAll(filter);
     }

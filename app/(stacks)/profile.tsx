@@ -14,7 +14,7 @@ import { typography } from '../../src/theme/typography';
 export default function ProfileScreen() {
   const router = useRouter();
   const tc = useThemeStore().colors;
-  const [name, setName] = useState('');
+  const [name, setName] = useState('User');
   const [profession, setProfession] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 

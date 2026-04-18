@@ -3,7 +3,7 @@
     "name": "Plandex",
     "slug": "myplanner",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "plandex",
     "userInterfaceStyle": "automatic",
@@ -14,8 +14,8 @@
     "updates": {
       "url": "https://u.expo.dev/9f836fb9-8e6e-4ed9-978f-5bbcb5082249",
       "enabled": true,
-      "fallbackToCacheTimeout": 5000,
-      "checkAutomatically": "ON_LOAD"
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_ERROR_RECOVERY"
     },
     "ios": {
       "supportsTablet": true,

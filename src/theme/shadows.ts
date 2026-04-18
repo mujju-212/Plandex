@@ -1,50 +1,50 @@
 import { Platform } from 'react-native';
 
 export const shadows = {
-    // Soft, slightly blue-tinted drop shadows for the neumorphic feeling
+    // Subtle neutral shadows for clean card separation without heavy glow
     sm: Platform.select({
         ios: {
-            shadowColor: '#85C1E9',
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.06,
+            shadowRadius: 2,
+        },
+        android: {
+            elevation: 1,
+        },
+    }),
+    md: Platform.select({
+        ios: {
+            shadowColor: '#000000',
             shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
+            shadowOpacity: 0.08,
+            shadowRadius: 5,
         },
         android: {
             elevation: 2,
         },
     }),
-    md: Platform.select({
+    lg: Platform.select({
         ios: {
-            shadowColor: '#85C1E9',
+            shadowColor: '#000000',
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.15,
-            shadowRadius: 8,
+            shadowOpacity: 0.1,
+            shadowRadius: 10,
         },
         android: {
             elevation: 4,
         },
     }),
-    lg: Platform.select({
-        ios: {
-            shadowColor: '#4A9BE2',
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.2,
-            shadowRadius: 16,
-        },
-        android: {
-            elevation: 8,
-        },
-    }),
-    // For the active/gradient components like the Save Button or FAB
+    // Stronger highlight for active/gradient components like FAB
     glow: Platform.select({
         ios: {
             shadowColor: '#4A9BE2',
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
+            shadowOpacity: 0.2,
             shadowRadius: 10,
         },
         android: {
-            elevation: 6,
+            elevation: 5,
         },
     }),
 };

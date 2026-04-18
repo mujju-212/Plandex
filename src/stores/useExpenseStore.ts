@@ -11,10 +11,11 @@ interface ExpenseState {
   loadExpenses: (filter?: ExpenseFilter) => Promise<void>;
   loadCategories: () => Promise<void>;
   loadSummary: (startDate: string, endDate: string) => Promise<void>;
+  getSummaryForRange: (startDate: string, endDate: string) => Promise<ExpenseSummary>;
   addExpense: (input: CreateExpenseInput) => Promise<Expense>;
   updateExpense: (id: number, input: UpdateExpenseInput) => Promise<void>;
   deleteExpense: (id: number) => Promise<void>;
-  addCategory: (name: string, icon: string, color: string, budget?: number) => Promise<void>;
+  addCategory: (name: string, icon: string, color: string, budget?: number) => Promise<ExpenseCategory>;
 }
 
 export const useExpenseStore = create<ExpenseState>((set) => ({
@@ -46,6 +47,10 @@ export const useExpenseStore = create<ExpenseState>((set) => ({
     } catch (e: any) { set({ error: e.message }); }
   },
 
+  getSummaryForRange: async (startDate, endDate) => {
+    return expenseRepository.getSummary(startDate, endDate);
+  },
+
   addExpense: async (input) => {
     try {
       const expense = await expenseRepository.insert(input);
@@ -72,6 +77,8 @@ export const useExpenseStore = create<ExpenseState>((set) => ({
     try {
       const cat = await expenseRepository.addCategory(name, icon, color, budget);
       set(s => ({ categories: [...s.categories, cat] }));
+      return cat;
     } catch (e: any) { set({ error: e.message }); }
+    throw new Error('Failed to add category');
   },
 }));

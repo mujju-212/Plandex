@@ -30,7 +30,7 @@ export default function TodoItem({
 }: TodoItemProps) {
   const tc = useThemeStore().colors;
   return (
-    <Card style={styles.card} onPress={onPress}>
+    <Card style={styles.card} onPress={onPress} withShadow={false} withMargin={false}>
       <View style={styles.container}>
         <Pressable onPress={onToggle} style={styles.checkboxContainer}>
           <MaterialIcons
@@ -62,7 +62,7 @@ export default function TodoItem({
 const styles = StyleSheet.create({
   card: {
     marginHorizontal: 20,
-    marginVertical: 6,
+    marginVertical: 3,
     padding: 16,
   },
   container: {

@@ -15,7 +15,7 @@ type FilterStatus = 'all' | 'pending' | 'completed' | 'archived';
 export default function TodosTab() {
   const router = useRouter();
   const tc = useThemeStore().colors;
-  const { todos, loadTodos, completeTodo, uncompleteTodo, isLoading } = useTodoStore();
+  const { todos, lists, loadTodos, loadTodoLists, completeTodo, uncompleteTodo, isLoading } = useTodoStore();
   const [activeFilter, setActiveFilter] = useState<FilterStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSidebar, setShowSidebar] = useState(false);
@@ -42,6 +42,10 @@ export default function TodosTab() {
     loadWithFilter();
   }, [loadWithFilter]);
 
+  useEffect(() => {
+    loadTodoLists();
+  }, [loadTodoLists]);
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent': return tc.danger;
@@ -52,9 +56,15 @@ export default function TodosTab() {
     }
   };
 
-  const getTagAppearance = (tags: string[]) => {
-    if (!tags || tags.length === 0) return 'default';
-    const tag = tags[0].toLowerCase();
+  const listNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    lists.forEach((list) => map.set(list.id, list.name));
+    return map;
+  }, [lists]);
+
+  const getTagAppearance = (label?: string) => {
+    if (!label) return 'default';
+    const tag = label.toLowerCase();
     if (['work', 'job', 'office'].includes(tag)) return 'work';
     if (['health', 'gym', 'workout'].includes(tag)) return 'health';
     if (['personal', 'home'].includes(tag)) return 'personal';
@@ -108,12 +118,7 @@ export default function TodosTab() {
         )}
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterBar}
-        contentContainerStyle={styles.filterContent}
-      >
+      <View style={styles.filterBar}>
         {filters.map((f) => (
           <TouchableOpacity
             key={f.value}
@@ -125,7 +130,7 @@ export default function TodosTab() {
             </Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -144,25 +149,28 @@ export default function TodosTab() {
             </Text>
           </View>
         ) : (
-          filteredTodos.map((todo) => (
-            <TodoItem
-              key={todo.id}
-              title={todo.title}
-              tagLabel={todo.tags?.[0] || 'Task'}
-              tagAppearance={getTagAppearance(todo.tags)}
-              time={todo.due_time || 'No Time'}
-              priorityColor={getPriorityColor(todo.priority)}
-              isCompleted={todo.status === 'completed'}
-              onPress={() => router.push(`/todo/${todo.id}`)}
-              onToggle={() => {
-                if (todo.status === 'completed') {
-                  uncompleteTodo(todo.id);
-                } else {
-                  completeTodo(todo.id);
-                }
-              }}
-            />
-          ))
+          filteredTodos.map((todo) => {
+            const categoryLabel = (todo.list_id ? listNameById.get(todo.list_id) : undefined) || todo.tags?.[0] || 'Task';
+            return (
+              <TodoItem
+                key={todo.id}
+                title={todo.title}
+                tagLabel={categoryLabel}
+                tagAppearance={getTagAppearance(categoryLabel)}
+                time={todo.due_time || 'No Time'}
+                priorityColor={getPriorityColor(todo.priority)}
+                isCompleted={todo.status === 'completed'}
+                onPress={() => router.push(`/todo/${todo.id}`)}
+                onToggle={() => {
+                  if (todo.status === 'completed') {
+                    uncompleteTodo(todo.id);
+                  } else {
+                    completeTodo(todo.id);
+                  }
+                }}
+              />
+            );
+          })
         )}
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -224,19 +232,24 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   filterBar: {
-    maxHeight: 48,
-  },
-  filterContent: {
     paddingHorizontal: 20,
-    gap: 8,
+    paddingVertical: 6,
+    marginBottom: 4,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: 8,
+    rowGap: 8,
+    alignItems: 'center',
   },
   filterChip: {
+    minHeight: 38,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: colors.cardBackground,
     borderWidth: 1,
     borderColor: colors.border,
+    justifyContent: 'center',
   },
   filterChipActive: {
     backgroundColor: colors.primary,
@@ -244,8 +257,10 @@ const styles = StyleSheet.create({
   },
   filterChipText: {
     fontSize: typography.sizes.sm,
+    lineHeight: 18,
     color: colors.textSecondary,
     fontWeight: typography.weights.medium as any,
+    includeFontPadding: false,
   },
   filterChipTextActive: {
     color: '#FFFFFF',

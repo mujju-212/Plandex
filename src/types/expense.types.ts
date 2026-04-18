@@ -64,5 +64,7 @@ export interface ExpenseSummary {
   totalExpense: number;
   totalIncome: number;
   balance: number;
+  openingBalance: number;
+  closingBalance: number;
   byCategory: { category: string; color: string; icon: string; total: number; percentage: number }[];
 }

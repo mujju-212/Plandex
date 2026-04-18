@@ -80,7 +80,7 @@ export default function CreateHabitScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Card style={styles.card}>
+        <Card style={styles.card} withShadow={false}>
           <TextInput style={[styles.titleInput, { color: tc.textPrimary }]} placeholder="Habit title" placeholderTextColor={tc.textSecondary} value={title} onChangeText={setTitle} />
           <View style={[styles.divider, { backgroundColor: tc.border }]} />
           <TextInput style={[styles.descInput, { color: tc.textPrimary }]} placeholder="Description (optional)" placeholderTextColor={tc.textSecondary} value={description} onChangeText={setDescription} multiline textAlignVertical="top" />
@@ -121,7 +121,7 @@ export default function CreateHabitScreen() {
         )}
 
         {frequency === 'x_per_week' && (
-          <Card style={styles.card}>
+          <Card style={styles.card} withShadow={false}>
             <View style={styles.fieldRow}>
               <MaterialIcons name="repeat" size={20} color={tc.primary} />
               <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Times/week</Text>
@@ -140,7 +140,7 @@ export default function CreateHabitScreen() {
         </ScrollView>
 
         <Text style={[styles.label, { color: tc.textSecondary }]}>Reminder</Text>
-        <Card style={styles.card}>
+        <Card style={styles.card} withShadow={false}>
           <View style={styles.fieldRow}>
             <MaterialIcons name="notifications" size={20} color={tc.warning} />
             <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Time</Text>

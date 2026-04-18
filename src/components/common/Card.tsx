@@ -1,18 +1,19 @@
-import React from 'react';
-import { View, StyleSheet, ViewStyle, StyleProp, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../theme/colors';
-import { shadows } from '../../theme/shadows';
+import React from 'react';
+import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { useThemeStore } from '../../stores/useThemeStore';
+import { shadows } from '../../theme/shadows';
 
 type CardProps = {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
   gradient?: boolean;
+  withShadow?: boolean;
+  withMargin?: boolean;
 };
 
-export default function Card({ children, style, onPress, gradient = false }: CardProps) {
+export default function Card({ children, style, onPress, gradient = false, withShadow = true, withMargin = true }: CardProps) {
   const { colors: tc, isDark } = useThemeStore();
 
   const content = (
@@ -44,7 +45,8 @@ export default function Card({ children, style, onPress, gradient = false }: Car
         onPress={onPress}
         style={({ pressed }) => [
           styles.container,
-          pressed ? shadows.sm : shadows.md,
+          withMargin && styles.spaced,
+          withShadow && shadows.sm,
           pressed && { transform: [{ scale: 0.98 }] }
         ]}
       >
@@ -53,12 +55,14 @@ export default function Card({ children, style, onPress, gradient = false }: Car
     );
   }
 
-  return <View style={[styles.container, shadows.md, gradient && style]}>{wrappedContent}</View>;
+  return <View style={[styles.container, withMargin && styles.spaced, withShadow && shadows.sm, gradient && style]}>{wrappedContent}</View>;
 }
 
 const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
+  },
+  spaced: {
     marginVertical: 8,
   },
   card: {

@@ -1,8 +1,10 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Alert,
+    Keyboard,
+    KeyboardAvoidingView,
     Modal,
     Platform,
     Pressable,
@@ -24,14 +26,35 @@ export default function NotesScreen() {
   const router = useRouter();
   const tc = useThemeStore().colors;
   const { notes, loadNotes, addNote, updateNote, deleteNote, togglePin, isLoading } = useNoteStore();
+  const modalScrollRef = useRef<ScrollView>(null);
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [selectedColor, setSelectedColor] = useState(NOTE_COLORS[0]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => { loadNotes(); }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const filteredNotes = searchQuery
     ? notes.filter(n =>
@@ -124,7 +147,7 @@ export default function NotesScreen() {
       </View>
 
       {/* Notes Grid */}
-      <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {filteredNotes.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialIcons name="sticky-note-2" size={64} color={tc.border} />
@@ -179,65 +202,96 @@ export default function NotesScreen() {
       {/* Create/Edit Modal */}
       <Modal visible={showModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: tc.cardBackground }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: tc.textPrimary }]}>
-                {editId ? 'Edit Note' : 'New Note'}
-              </Text>
-              <TouchableOpacity onPress={() => { setShowModal(false); resetForm(); }}>
-                <MaterialIcons name="close" size={24} color={tc.textSecondary} />
-              </TouchableOpacity>
-            </View>
+          <KeyboardAvoidingView
+            style={[
+              styles.modalKeyboard,
+              Platform.OS === 'android' && keyboardHeight > 0 ? { paddingBottom: keyboardHeight } : null,
+            ]}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+          >
+            <View
+              style={[
+                styles.modalContent,
+                { backgroundColor: tc.cardBackground },
+              ]}
+            >
+              <ScrollView
+                ref={modalScrollRef}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.modalScrollContent}
+              >
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: tc.textPrimary }]}> 
+                    {editId ? 'Edit Note' : 'New Note'}
+                  </Text>
+                  <TouchableOpacity onPress={() => { setShowModal(false); resetForm(); }}>
+                    <MaterialIcons name="close" size={24} color={tc.textSecondary} />
+                  </TouchableOpacity>
+                </View>
 
-            <TextInput
-              style={[styles.input, { backgroundColor: tc.background, color: tc.textPrimary, borderColor: tc.border }]}
-              placeholder="Title (optional)"
-              placeholderTextColor={tc.textSecondary}
-              value={title}
-              onChangeText={setTitle}
-            />
+                <TextInput
+                  style={[styles.input, { backgroundColor: tc.background, color: tc.textPrimary, borderColor: tc.border }]}
+                  placeholder="Title (optional)"
+                  placeholderTextColor={tc.textSecondary}
+                  value={title}
+                  onChangeText={setTitle}
+                  onFocus={() => {
+                    requestAnimationFrame(() => {
+                      modalScrollRef.current?.scrollTo({ y: 0, animated: true });
+                    });
+                  }}
+                />
 
-            <TextInput
-              style={[styles.input, styles.contentInput, { backgroundColor: tc.background, color: tc.textPrimary, borderColor: tc.border }]}
-              placeholder="Write your note..."
-              placeholderTextColor={tc.textSecondary}
-              value={content}
-              onChangeText={setContent}
-              multiline
-              textAlignVertical="top"
-            />
+                <TextInput
+                  style={[styles.input, styles.contentInput, { backgroundColor: tc.background, color: tc.textPrimary, borderColor: tc.border }]}
+                  placeholder="Write your note..."
+                  placeholderTextColor={tc.textSecondary}
+                  value={content}
+                  onChangeText={setContent}
+                  onFocus={() => {
+                    requestAnimationFrame(() => {
+                      modalScrollRef.current?.scrollToEnd({ animated: true });
+                    });
+                  }}
+                  multiline
+                  textAlignVertical="top"
+                />
 
-            {/* Color Picker */}
-            <Text style={[styles.colorLabel, { color: tc.textSecondary }]}>Color</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorRow}>
-              {NOTE_COLORS.map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  style={[
-                    styles.colorDot,
-                    { backgroundColor: c },
-                    selectedColor === c && styles.colorDotSelected,
-                  ]}
-                  onPress={() => setSelectedColor(c)}
-                >
-                  {selectedColor === c && (
-                    <MaterialIcons name="check" size={16} color={getContrastText(c)} />
-                  )}
+                {/* Color Picker */}
+                <Text style={[styles.colorLabel, { color: tc.textSecondary }]}>Color</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorRow}>
+                  {NOTE_COLORS.map((c) => (
+                    <TouchableOpacity
+                      key={c}
+                      style={[
+                        styles.colorDot,
+                        { backgroundColor: c },
+                        selectedColor === c && styles.colorDotSelected,
+                      ]}
+                      onPress={() => setSelectedColor(c)}
+                    >
+                      {selectedColor === c && (
+                        <MaterialIcons name="check" size={16} color={getContrastText(c)} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* Preview */}
+                <View style={[styles.preview, { backgroundColor: selectedColor }]}>
+                  <Text style={[styles.previewText, { color: getContrastText(selectedColor) }]}>
+                    {title || content || 'Preview'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity style={[styles.saveBtn, { backgroundColor: tc.primary }]} onPress={handleSave}>
+                  <Text style={styles.saveBtnText}>{editId ? 'Update' : 'Create'}</Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* Preview */}
-            <View style={[styles.preview, { backgroundColor: selectedColor }]}>
-              <Text style={[styles.previewText, { color: getContrastText(selectedColor) }]}>
-                {title || content || 'Preview'}
-              </Text>
+              </ScrollView>
             </View>
-
-            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: tc.primary }]} onPress={handleSave}>
-              <Text style={styles.saveBtnText}>{editId ? 'Update' : 'Create'}</Text>
-            </TouchableOpacity>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </SafeAreaView>
@@ -307,11 +361,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
+  modalKeyboard: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'flex-end',
+  },
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    maxHeight: '85%',
+    maxHeight: '92%',
+  },
+  modalScrollContent: {
+    paddingBottom: 12,
   },
   modalHeader: {
     flexDirection: 'row',

@@ -3,7 +3,7 @@ import { addDays, format, subDays } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Sidebar from '../../src/components/common/Sidebar';
 import { useLogStore } from '../../src/stores/useLogStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
@@ -100,7 +100,12 @@ export default function DailyLogScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tc.background }]}>
       <Sidebar visible={showSidebar} onClose={() => setShowSidebar(false)} />
-      
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
       {/* Header with date navigation and menu */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -157,7 +162,7 @@ export default function DailyLogScreen() {
 
       {activeTab === 'write' ? (
         /* WRITE TAB */
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Mood Picker */}
           <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>How was your day?</Text>
           <View style={styles.moodRow}>
@@ -262,7 +267,7 @@ export default function DailyLogScreen() {
             ))}
           </ScrollView>
 
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {pastLogs.length === 0 ? (
             <View style={styles.emptyHistory}>
               <MaterialIcons name="event-note" size={64} color={tc.border} />
@@ -321,6 +326,7 @@ export default function DailyLogScreen() {
           </Pressable>
         </View>
       )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

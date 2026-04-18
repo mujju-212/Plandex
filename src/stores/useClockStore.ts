@@ -49,7 +49,7 @@ export const useClockStore = create<ClockState>((set, get) => ({
       set({ error: null });
       const updated = await clockRepository.updateAlarm(id, input);
       set(s => ({ alarms: s.alarms.map(a => a.id === id ? updated : a) }));
-    } catch (e: any) { set({ error: e.message }); }
+    } catch (e: any) { set({ error: e.message }); throw e; }
   },
 
   deleteAlarm: async (id) => {
@@ -57,7 +57,7 @@ export const useClockStore = create<ClockState>((set, get) => ({
       set({ error: null });
       await clockRepository.deleteAlarm(id);
       set(s => ({ alarms: s.alarms.filter(a => a.id !== id) }));
-    } catch (e: any) { set({ error: e.message }); }
+    } catch (e: any) { set({ error: e.message }); throw e; }
   },
 
   toggleAlarm: async (id) => {
@@ -66,7 +66,7 @@ export const useClockStore = create<ClockState>((set, get) => ({
       const alarm = get().alarms.find(a => a.id === id);
       if (!alarm) throw new Error('Alarm not found');
       await get().updateAlarm(id, { is_enabled: !alarm.is_enabled });
-    } catch (e: any) { set({ error: e.message }); }
+    } catch (e: any) { set({ error: e.message }); throw e; }
   },
 
   loadSessions: async () => {

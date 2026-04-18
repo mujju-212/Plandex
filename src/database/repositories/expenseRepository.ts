@@ -19,6 +19,44 @@ const mapExpenseRow = (row: any): Expense => ({
 const mapCatRow = (row: any): ExpenseCategory => ({ ...row, is_default: !!row.is_default });
 
 class ExpenseRepository {
+  private async getTotals(filter?: { startDate?: string; endDate?: string }): Promise<{ expense: number; income: number }> {
+    if (Platform.OS === 'web') {
+      let exps = await getWebExpenses();
+      if (filter?.startDate) exps = exps.filter(e => e.date >= filter.startDate!);
+      if (filter?.endDate) exps = exps.filter(e => e.date <= filter.endDate!);
+      const expense = exps.filter(e => e.expense_type === 'expense').reduce((s, e) => s + e.amount, 0);
+      const income = exps.filter(e => e.expense_type === 'income').reduce((s, e) => s + e.amount, 0);
+      return { expense, income };
+    }
+
+    const db = getDB();
+    let sql = `SELECT
+      COALESCE(SUM(CASE WHEN expense_type = 'expense' THEN amount ELSE 0 END), 0) as totalExpense,
+      COALESCE(SUM(CASE WHEN expense_type = 'income' THEN amount ELSE 0 END), 0) as totalIncome
+      FROM expenses`;
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (filter?.startDate) {
+      conditions.push('date >= ?');
+      params.push(filter.startDate);
+    }
+    if (filter?.endDate) {
+      conditions.push('date <= ?');
+      params.push(filter.endDate);
+    }
+
+    if (conditions.length > 0) {
+      sql += ` WHERE ${conditions.join(' AND ')}`;
+    }
+
+    const row = await db.getFirstAsync<{ totalExpense: number; totalIncome: number }>(sql, params);
+    return {
+      expense: row?.totalExpense || 0,
+      income: row?.totalIncome || 0,
+    };
+  }
+
   // ── Categories ──
   async getCategories(): Promise<ExpenseCategory[]> {
     if (Platform.OS === 'web') return getWebCategories();
@@ -129,10 +167,15 @@ class ExpenseRepository {
   async getSummary(startDate: string, endDate: string): Promise<ExpenseSummary> {
     const all = await this.findAll({ startDate, endDate });
     const categories = await this.getCategories();
+    const periodTotals = await this.getTotals({ startDate, endDate });
+    const [year, month, day] = startDate.split('-').map(Number);
+    const openingDate = new Date(year, month - 1, day - 1);
+    const openingEndDate = `${openingDate.getFullYear()}-${String(openingDate.getMonth() + 1).padStart(2, '0')}-${String(openingDate.getDate()).padStart(2, '0')}`;
+    const openingTotals = await this.getTotals({ endDate: openingEndDate });
     const catLookup = new Map(categories.map(c => [c.id, c]));
 
-    const totalExpense = all.filter(e => e.expense_type === 'expense').reduce((s, e) => s + e.amount, 0);
-    const totalIncome = all.filter(e => e.expense_type === 'income').reduce((s, e) => s + e.amount, 0);
+    const totalExpense = periodTotals.expense;
+    const totalIncome = periodTotals.income;
     const catMap = new Map<string, { color: string; icon: string; total: number }>();
     all.filter(e => e.expense_type === 'expense').forEach(e => {
       const cat = e.category_id ? catLookup.get(e.category_id) : undefined;
@@ -146,7 +189,12 @@ class ExpenseRepository {
     const byCategory = Array.from(catMap.entries()).map(([category, v]) => ({
       category, ...v, percentage: totalExpense > 0 ? (v.total / totalExpense) * 100 : 0,
     })).sort((a, b) => b.total - a.total);
-    return { totalExpense, totalIncome, balance: totalIncome - totalExpense, byCategory };
+
+    const openingBalance = openingTotals.income - openingTotals.expense;
+    const balance = totalIncome - totalExpense;
+    const closingBalance = openingBalance + balance;
+
+    return { totalExpense, totalIncome, balance, openingBalance, closingBalance, byCategory };
   }
 }
 

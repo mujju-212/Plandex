@@ -3,6 +3,18 @@ import { CreateDailyLogInput, DailyLog, UpdateDailyLogInput } from '../types/log
 import { gamificationService } from './gamificationService';
 
 class LogService {
+    private validateRatings(input: CreateDailyLogInput | UpdateDailyLogInput) {
+        const ratingFields: (keyof CreateDailyLogInput)[] = ['productivity_rating', 'satisfaction_rating', 'completion_rating', 'energy_rating', 'overall_rating'];
+        for (const field of ratingFields) {
+            const val = input[field] as number | undefined | null;
+            if (val !== undefined && val !== null) {
+                if (typeof val !== 'number' || val < 1 || val > 10 || !Number.isInteger(val)) {
+                    throw new Error(`${String(field)} must be an integer between 1 and 10`);
+                }
+            }
+        }
+    }
+
     async getDailyLog(date: string): Promise<DailyLog | null> {
         return logRepository.findByDate(date);
     }
@@ -24,16 +36,8 @@ class LogService {
             throw new Error('Invalid date format. Expected YYYY-MM-DD');
         }
 
-        // Validate rating fields (1-5 range)
-        const ratingFields: (keyof CreateDailyLogInput)[] = ['productivity_rating', 'satisfaction_rating', 'completion_rating', 'energy_rating', 'overall_rating'];
-        for (const field of ratingFields) {
-            const val = input[field] as number | undefined | null;
-            if (val !== undefined && val !== null) {
-                if (typeof val !== 'number' || val < 1 || val > 5 || !Number.isInteger(val)) {
-                    throw new Error(`${String(field)} must be an integer between 1 and 5`);
-                }
-            }
-        }
+        // Validate rating fields (1-10 range)
+        this.validateRatings(input);
 
         // Check if a log already exists for this date (to prevent XP farming on updates)
         const existing = await logRepository.findByDate(input.date);
@@ -50,6 +54,7 @@ class LogService {
     }
 
     async updateDailyLog(date: string, input: UpdateDailyLogInput): Promise<DailyLog> {
+        this.validateRatings(input);
         return logRepository.update(date, input);
     }
 

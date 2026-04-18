@@ -6,9 +6,14 @@
 
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import type { Alarm } from '../types/clock.types';
 
 // Detect Expo Go — notifications module is unsupported there since SDK 53
 const isExpoGo = Constants.appOwnership === 'expo';
+export const ALARM_CHANNEL_ID = 'alarm-channel';
+export const ALARM_NOTIFICATION_CATEGORY_ID = 'alarm-actions';
+export const ALARM_ACTION_SNOOZE = 'alarm-snooze';
+export const ALARM_ACTION_STOP = 'alarm-stop';
 
 /**
  * Returns true when notification APIs are unavailable (Expo Go or web).
@@ -30,6 +35,52 @@ function getNotificationsModule(): typeof import('expo-notifications') | null {
   }
 }
 
+async function ensureAlarmChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  const Notifications = getNotificationsModule();
+  if (!Notifications?.setNotificationChannelAsync) return;
+
+  try {
+    await Notifications.setNotificationChannelAsync(ALARM_CHANNEL_ID, {
+      name: 'Alarms',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+      sound: 'default',
+    });
+  } catch {
+    // ignore channel setup failures
+  }
+}
+
+async function ensureAlarmCategory(): Promise<void> {
+  const Notifications = getNotificationsModule();
+  if (!Notifications?.setNotificationCategoryAsync) return;
+
+  try {
+    await Notifications.setNotificationCategoryAsync(ALARM_NOTIFICATION_CATEGORY_ID, [
+      {
+        identifier: ALARM_ACTION_SNOOZE,
+        buttonTitle: 'Snooze 5 min',
+        options: { opensAppToForeground: true },
+      },
+      {
+        identifier: ALARM_ACTION_STOP,
+        buttonTitle: 'Stop',
+        options: { opensAppToForeground: true, isDestructive: true },
+      },
+    ]);
+  } catch {
+    // ignore category setup failures
+  }
+}
+
+async function ensureAlarmNotificationSetup(): Promise<void> {
+  await ensureAlarmChannel();
+  await ensureAlarmCategory();
+}
+
 // Configure foreground notification behaviour (only in dev-builds / production)
 if (!isNotificationUnavailable()) {
   try {
@@ -43,6 +94,10 @@ if (!isNotificationUnavailable()) {
           shouldShowBanner: true,
           shouldShowList: true,
         }),
+      });
+
+      ensureAlarmNotificationSetup().catch(() => {
+        // ignore channel setup failures
       });
     }
   } catch {
@@ -60,10 +115,17 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
   try {
     const { status: existing } = await Notifications.getPermissionsAsync();
-    if (existing === 'granted') return true;
+    if (existing === 'granted') {
+      await ensureAlarmNotificationSetup();
+      return true;
+    }
 
     const { status } = await Notifications.requestPermissionsAsync();
-    return status === 'granted';
+    const granted = status === 'granted';
+    if (granted) {
+      await ensureAlarmNotificationSetup();
+    }
+    return granted;
   } catch {
     return false;
   }
@@ -437,4 +499,114 @@ export async function scheduleMorningScheduleWithEvents(
   } catch {
     return null;
   }
+}
+
+// ─── Alarm Reminders ───────────────────────────────────────
+
+const ALARM_NOTIF_PREFIX = 'alarm-reminder-';
+
+function getAlarmNotificationId(alarmId: number, weekday?: number): string {
+  return `${ALARM_NOTIF_PREFIX}${alarmId}${weekday !== undefined ? `-${weekday}` : ''}`;
+}
+
+function getNextAlarmDate(hour: number, minute: number): Date {
+  const now = new Date();
+  const next = new Date();
+  next.setHours(hour, minute, 0, 0);
+  if (next.getTime() <= now.getTime()) {
+    next.setDate(next.getDate() + 1);
+  }
+  return next;
+}
+
+/**
+ * Cancels all scheduled notifications associated with a specific alarm.
+ */
+export async function cancelAlarmReminders(alarmId: number): Promise<void> {
+  const Notifications = getNotificationsModule();
+  if (!Notifications) return;
+
+  try {
+    await Notifications.cancelScheduledNotificationAsync(getAlarmNotificationId(alarmId));
+  } catch {}
+
+  // Clear weekly reminders for all possible weekdays.
+  for (let weekday = 1; weekday <= 7; weekday++) {
+    try {
+      await Notifications.cancelScheduledNotificationAsync(getAlarmNotificationId(alarmId, weekday));
+    } catch {}
+  }
+}
+
+/**
+ * Schedules notifications for an alarm.
+ * - No repeat days: schedules next occurrence as a one-time date trigger.
+ * - Repeat days: schedules weekly reminders for each selected weekday.
+ */
+export async function scheduleAlarmReminders(alarm: Alarm): Promise<string[]> {
+  const Notifications = getNotificationsModule();
+  if (!Notifications) return [];
+
+  const granted = await hasNotificationPermission();
+  if (!granted) return [];
+
+  await cancelAlarmReminders(alarm.id);
+  if (!alarm.is_enabled) return [];
+
+  const title = '⏰ Alarm';
+  const body = alarm.label?.trim() || 'Alarm time';
+  const shouldPlaySound = (alarm.sound_name || '').toLowerCase() !== 'vibrate only';
+  const scheduledIds: string[] = [];
+
+  try {
+    if (!alarm.repeat_days || alarm.repeat_days.length === 0) {
+      const id = getAlarmNotificationId(alarm.id);
+      const date = getNextAlarmDate(alarm.hour, alarm.minute);
+      await Notifications.scheduleNotificationAsync({
+        identifier: id,
+        content: {
+          title,
+          body,
+          data: { type: 'alarm', alarmId: alarm.id, alarmLabel: body },
+          categoryIdentifier: ALARM_NOTIFICATION_CATEGORY_ID,
+          sound: shouldPlaySound,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date,
+          channelId: ALARM_CHANNEL_ID,
+        },
+      });
+      scheduledIds.push(id);
+      return scheduledIds;
+    }
+
+    for (const day of alarm.repeat_days) {
+      if (typeof day !== 'number' || day < 0 || day > 6) continue;
+      const weekday = day + 1; // expo-notifications weekly trigger uses 1=Sunday ... 7=Saturday
+      const id = getAlarmNotificationId(alarm.id, weekday);
+      await Notifications.scheduleNotificationAsync({
+        identifier: id,
+        content: {
+          title,
+          body,
+          data: { type: 'alarm', alarmId: alarm.id, alarmLabel: body },
+          categoryIdentifier: ALARM_NOTIFICATION_CATEGORY_ID,
+          sound: shouldPlaySound,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          weekday,
+          hour: alarm.hour,
+          minute: alarm.minute,
+          channelId: ALARM_CHANNEL_ID,
+        },
+      });
+      scheduledIds.push(id);
+    }
+  } catch {
+    return scheduledIds;
+  }
+
+  return scheduledIds;
 }

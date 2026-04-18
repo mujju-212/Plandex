@@ -84,7 +84,7 @@ export default function CreateGoalScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Card style={styles.card}>
+        <Card style={styles.card} withShadow={false}>
           <TextInput style={[styles.titleInput, { color: tc.textPrimary }]} placeholder="Goal title" placeholderTextColor={tc.textSecondary} value={title} onChangeText={setTitle} />
           <View style={[styles.divider, { backgroundColor: tc.border }]} />
           <TextInput style={[styles.descInput, { color: tc.textPrimary }]} placeholder="Description (optional)" placeholderTextColor={tc.textSecondary} value={description} onChangeText={setDescription} multiline textAlignVertical="top" />
@@ -115,7 +115,7 @@ export default function CreateGoalScreen() {
         </View>
 
         {goalType === 'measurable' && (
-          <Card style={styles.card}>
+          <Card style={styles.card} withShadow={false}>
             <View style={styles.fieldRow}>
               <MaterialIcons name="track-changes" size={20} color={tc.primary} />
               <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Target</Text>
@@ -144,7 +144,7 @@ export default function CreateGoalScreen() {
         </View>
 
         <Text style={[styles.label, { color: tc.textSecondary }]}>Dates</Text>
-        <Card style={styles.card}>
+        <Card style={styles.card} withShadow={false}>
           <View style={styles.fieldRow}>
             <MaterialIcons name="calendar-today" size={20} color={tc.primary} />
             <Text style={[styles.fieldLabel, { color: tc.textPrimary }]}>Start</Text>
@@ -175,7 +175,7 @@ export default function CreateGoalScreen() {
         </Card>
 
         <Text style={[styles.label, { color: tc.textSecondary }]}>Milestones</Text>
-        <Card style={styles.card}>
+        <Card style={styles.card} withShadow={false}>
           <TextInput style={[styles.descInput, { height: 100, color: tc.textPrimary }]} placeholder="One milestone per line..." placeholderTextColor={tc.textSecondary} value={milestonesText} onChangeText={setMilestonesText} multiline textAlignVertical="top" />
         </Card>
 

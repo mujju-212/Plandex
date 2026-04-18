@@ -51,7 +51,7 @@ export default function MoreTab() {
   const { notificationsEnabled, toggleNotifications, loadSettings } = useSettingsStore();
   const { totalXP, currentLevel, levelTitle, currentStreak, todosCompleted, loadStats } = useGamificationStore();
   const [showSidebar, setShowSidebar] = React.useState(false);
-  const [profileName, setProfileName] = useState('M');
+  const [profileName, setProfileName] = useState('User');
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function MoreTab() {
   }, []);
 
   const loadProfileData = useCallback(() => {
-    AsyncStorage.getItem('profile_name').then(v => setProfileName(v || 'M'));
+    AsyncStorage.getItem('profile_name').then(v => setProfileName(v || 'User'));
     AsyncStorage.getItem('profile_photo_uri').then(v => setProfilePhoto(v));
   }, []);
 

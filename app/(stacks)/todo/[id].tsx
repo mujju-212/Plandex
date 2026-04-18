@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, Pressable } from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useThemeStore } from '../../../src/stores/useThemeStore';
+import { useTodoStore } from '../../../src/stores/useTodoStore';
 import { colors } from '../../../src/theme/colors';
 import { typography } from '../../../src/theme/typography';
-import { useTodoStore } from '../../../src/stores/useTodoStore';
 import { Todo } from '../../../src/types/todo.types';
-import { useThemeStore } from '../../../src/stores/useThemeStore';
 
 export default function TodoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
-import { Stack, useRouter } from 'expo-router';
+import Constants from 'expo-constants';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Alert,
@@ -18,12 +18,22 @@ import {
     TouchableOpacity,
     TouchableWithoutFeedback,
     useWindowDimensions,
+    Vibration,
     View
 } from 'react-native';
+import {
+    ALARM_ACTION_SNOOZE,
+    ALARM_ACTION_STOP,
+    ALARM_CHANNEL_ID,
+    ALARM_NOTIFICATION_CATEGORY_ID,
+    cancelAlarmReminders,
+    requestNotificationPermissions,
+    scheduleAlarmReminders,
+} from '../../src/services/notificationService';
 import { useClockStore } from '../../src/stores/useClockStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { typography } from '../../src/theme/typography';
-import { DAY_LABELS, TimerMode } from '../../src/types/clock.types';
+import { Alarm, CreateAlarmInput, DAY_LABELS, TimerMode } from '../../src/types/clock.types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -42,13 +52,91 @@ const ALARM_TONES = [
 const ITEM_H = 44;
 const VISIBLE_ITEMS = 5;
 const PICKER_H = ITEM_H * VISIBLE_ITEMS;
+const ALARM_SNOOZE_MINUTES = 5;
+
+function getDocumentPickerModule() {
+  try {
+    return require('expo-document-picker') as typeof import('expo-document-picker');
+  } catch {
+    return null;
+  }
+}
+
+function getHapticsModule() {
+  try {
+    return require('expo-haptics') as typeof import('expo-haptics');
+  } catch {
+    return null;
+  }
+}
+
+function getAudioModule() {
+  if (Platform.OS === 'web') return null;
+  try {
+    return require('expo-av') as typeof import('expo-av');
+  } catch {
+    return null;
+  }
+}
+
+function getFileSystemModule() {
+  if (Platform.OS === 'web') return null;
+  try {
+    return require('expo-file-system/legacy') as typeof import('expo-file-system/legacy');
+  } catch {
+    return null;
+  }
+}
+
+function getNotificationsModule() {
+  if (Platform.OS === 'web') return null;
+  try {
+    return require('expo-notifications') as typeof import('expo-notifications');
+  } catch {
+    return null;
+  }
+}
+
+// expo-screen-orientation is intentionally NOT required here.
+// On New Architecture (newArchEnabled:true / Bridgeless) builds, JSI's
+// requireNativeModule throws synchronously before any try/catch can
+// intercept it when the native module isn't registered — causing a crash.
+// The fullscreen layout already adapts via useWindowDimensions(), so
+// locking orientation is a nice-to-have, not a requirement.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function lockOrientationSafe(_mode: 'landscape' | 'default') {
+  // No-op: orientation locking removed to prevent New Architecture crash.
+}
+
+function normalizeParamValue(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+function toTwelveHourParts(hour24: number): { hour12: number; meridiem: number } {
+  const meridiem = hour24 >= 12 ? 1 : 0;
+  const hour12 = ((hour24 + 11) % 12) + 1;
+  return { hour12, meridiem };
+}
+
+function toTwentyFourHour(hour12: number, meridiem: number): number {
+  const normalized = hour12 % 12;
+  return meridiem === 1 ? normalized + 12 : normalized;
+}
+
+function formatAlarmTime12(hour24: number, minute: number): string {
+  const { hour12, meridiem } = toTwelveHourParts(hour24);
+  const suffix = meridiem === 1 ? 'PM' : 'AM';
+  return `${hour12.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} ${suffix}`;
+}
 
 /* ── Scroll Drum Picker ── */
-const ScrollPicker = React.memo(({ items, selected, onChange, tc }: {
+const ScrollPicker = React.memo(({ items, selected, onChange, tc, width = 80 }: {
   items: { label: string; value: number }[];
   selected: number;
   onChange: (v: number) => void;
   tc: any;
+  width?: number;
 }) => {
   const flatRef = useRef<FlatList>(null);
   const scrolling = useRef(false);
@@ -77,7 +165,7 @@ const ScrollPicker = React.memo(({ items, selected, onChange, tc }: {
   };
 
   return (
-    <View style={{ height: PICKER_H, width: 80, overflow: 'hidden' }}>
+    <View style={{ height: PICKER_H, width, overflow: 'hidden' }}>
       {/* Selection highlight */}
       <View style={{
         position: 'absolute',
@@ -117,11 +205,16 @@ const ScrollPicker = React.memo(({ items, selected, onChange, tc }: {
     </View>
   );
 });
+ScrollPicker.displayName = 'ScrollPicker';
 
 /* ── Flip Digit with animation ── */
 const FlipDigit = React.memo(({ value, prevValue, color, size, overrideWidth }: { value: string; prevValue: string; color: string; size: 'normal' | 'fullscreen'; overrideWidth?: number }) => {
   const flipAnim = useRef(new Animated.Value(0)).current;
   const prevRef = useRef(prevValue);
+  // Allow flip animation on both iOS and Android.
+  // useNativeDriver:false is already set below which avoids the known
+  // rotateX crash in some Android release builds.
+  const canAnimateFlip = Platform.OS !== 'web';
   const digitW = overrideWidth ?? (size === 'fullscreen' ? Math.min(SCREEN_H / 4, 150) : Math.min((SCREEN_W - 80) / 6, 65));
   const digitH = digitW * 1.5;
   const fontSize = digitW * 1.15;
@@ -129,16 +222,22 @@ const FlipDigit = React.memo(({ value, prevValue, color, size, overrideWidth }: 
   const textColor = color;
 
   useEffect(() => {
+    if (!canAnimateFlip) {
+      prevRef.current = value;
+      return;
+    }
+
     if (value !== prevRef.current) {
       flipAnim.setValue(0);
       Animated.timing(flipAnim, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        // Native driver + rotateX can be unstable on some Android release builds.
+        useNativeDriver: false,
       }).start();
       prevRef.current = value;
     }
-  }, [value]);
+  }, [value, canAnimateFlip]);
 
   const topFlipRotate = flipAnim.interpolate({
     inputRange: [0, 1],
@@ -191,6 +290,8 @@ const FlipDigit = React.memo(({ value, prevValue, color, size, overrideWidth }: 
     </View>
   );
 
+  const staticBottomChar = canAnimateFlip ? prevValue : value;
+
   return (
     <View style={[{ width: digitW, height: digitH, marginHorizontal: size === 'fullscreen' ? 4 : 2 }]}>
       {/* Static top - new value (revealed when flip card goes) */}
@@ -200,46 +301,51 @@ const FlipDigit = React.memo(({ value, prevValue, color, size, overrideWidth }: 
 
       {/* Static bottom - old value (behind flip card) */}
       <View style={[dStyles.halfStatic, dStyles.bottomHalf, { backgroundColor: bgColor, opacity: 0.92, borderBottomLeftRadius: digitW * 0.15, borderBottomRightRadius: digitW * 0.15 }]}>
-        <BottomHalfText char={prevValue} />
+        <BottomHalfText char={staticBottomChar} />
       </View>
 
-      {/* Animated top flap (old value flipping away) */}
-      <Animated.View style={[
-        dStyles.halfStatic, dStyles.topHalf,
-        {
-          backgroundColor: bgColor,
-          borderTopLeftRadius: digitW * 0.15,
-          borderTopRightRadius: digitW * 0.15,
-          transform: [{ perspective: 300 }, { rotateX: topFlipRotate }],
-          opacity: topFlipOpacity,
-          zIndex: 3,
-          backfaceVisibility: 'hidden',
-        },
-      ]}>
-        <TopHalfText char={prevValue} />
-      </Animated.View>
+      {canAnimateFlip && (
+        <>
+          {/* Animated top flap (old value flipping away) */}
+          <Animated.View style={[
+            dStyles.halfStatic, dStyles.topHalf,
+            {
+              backgroundColor: bgColor,
+              borderTopLeftRadius: digitW * 0.15,
+              borderTopRightRadius: digitW * 0.15,
+              transform: [{ perspective: 300 }, { rotateX: topFlipRotate }],
+              opacity: topFlipOpacity,
+              zIndex: 3,
+              backfaceVisibility: 'hidden',
+            },
+          ]}>
+            <TopHalfText char={prevValue} />
+          </Animated.View>
 
-      {/* Animated bottom flap (new value flipping in) */}
-      <Animated.View style={[
-        dStyles.halfStatic, dStyles.bottomHalf,
-        {
-          backgroundColor: bgColor,
-          opacity: bottomFlipOpacity,
-          borderBottomLeftRadius: digitW * 0.15,
-          borderBottomRightRadius: digitW * 0.15,
-          transform: [{ perspective: 300 }, { rotateX: bottomFlipRotate }],
-          zIndex: 2,
-          backfaceVisibility: 'hidden',
-        },
-      ]}>
-        <BottomHalfText char={value} />
-      </Animated.View>
+          {/* Animated bottom flap (new value flipping in) */}
+          <Animated.View style={[
+            dStyles.halfStatic, dStyles.bottomHalf,
+            {
+              backgroundColor: bgColor,
+              opacity: bottomFlipOpacity,
+              borderBottomLeftRadius: digitW * 0.15,
+              borderBottomRightRadius: digitW * 0.15,
+              transform: [{ perspective: 300 }, { rotateX: bottomFlipRotate }],
+              zIndex: 2,
+              backfaceVisibility: 'hidden',
+            },
+          ]}>
+            <BottomHalfText char={value} />
+          </Animated.View>
+        </>
+      )}
 
       {/* Divider line */}
       <View style={[dStyles.divider, { top: digitH / 2 - 0.5 }]} />
     </View>
   );
 });
+FlipDigit.displayName = 'FlipDigit';
 
 const dStyles = StyleSheet.create({
   halfStatic: {
@@ -267,9 +373,9 @@ const dStyles = StyleSheet.create({
 });
 
 /* ── Separator ── */
-const Sep = ({ color, size, overrideDotSize }: { color: string; size: 'normal' | 'fullscreen'; overrideDotSize?: number }) => {
+const Sep = ({ color, size, overrideDotSize, overrideWidth }: { color: string; size: 'normal' | 'fullscreen'; overrideDotSize?: number; overrideWidth?: number }) => {
   const dotSize = overrideDotSize ?? (size === 'fullscreen' ? 12 : 8);
-  const sepW = size === 'fullscreen' ? (overrideDotSize ? overrideDotSize * 2.5 : 30) : 20;
+  const sepW = overrideWidth ?? (size === 'fullscreen' ? (overrideDotSize ? overrideDotSize * 2.5 : 30) : 20);
   const sepGap = size === 'fullscreen' ? (overrideDotSize ? overrideDotSize * 1.2 : 14) : 8;
   return (
     <View style={[styles.sepContainer, { width: sepW, gap: sepGap }]}>
@@ -297,13 +403,26 @@ const ModeTab = ({ mode, active, onPress, tc }: { mode: TimerMode; active: boole
 
 export default function ClockScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    alarmId?: string | string[];
+    alarmAction?: string | string[];
+    alarmTrigger?: string | string[];
+  }>();
   const tc = useThemeStore().colors;
   const { alarms, loadAlarms, addAlarm, updateAlarm, deleteAlarm, toggleAlarm } = useClockStore();
+  const isExpoGo = Constants.appOwnership === 'expo';
 
   const [mode, setMode] = useState<TimerMode>('clock');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const controlsTimeout = useRef<any>(null);
+  const [alarmSupportNote, setAlarmSupportNote] = useState<string | null>(null);
+  const lastAlarmTriggerRef = useRef<Record<number, string>>({});
+  const lastHandledNotificationRef = useRef<string>('');
+  const activeAlarmSoundRef = useRef<any>(null);
+  const snoozeTimeoutsRef = useRef<Record<number, any>>({});
+  const [activeRingingAlarm, setActiveRingingAlarm] = useState<Alarm | null>(null);
+  const [showRingingAlarmModal, setShowRingingAlarmModal] = useState(false);
 
   // Clock
   const [now, setNow] = useState(new Date());
@@ -326,21 +445,316 @@ export default function ClockScreen() {
 
   // Alarm modal
   const [showAlarmModal, setShowAlarmModal] = useState(false);
-  const [alarmHour, setAlarmHour] = useState(7);
+  const [alarmHour12, setAlarmHour12] = useState(7);
+  const [alarmMeridiem, setAlarmMeridiem] = useState(0); // 0 = AM, 1 = PM
   const [alarmMinute, setAlarmMinute] = useState(0);
   const [alarmLabel, setAlarmLabel] = useState('');
   const [alarmDays, setAlarmDays] = useState<number[]>([]);
   const [alarmTone, setAlarmTone] = useState('default');
   const [customToneName, setCustomToneName] = useState('');
   const [customToneUri, setCustomToneUri] = useState('');
+  const [editingAlarmId, setEditingAlarmId] = useState<number | null>(null);
 
   // Dynamic dimensions for fullscreen landscape support
   const { width: winW, height: winH } = useWindowDimensions();
 
-  const hourItems = React.useMemo(() => Array.from({ length: 24 }, (_, i) => ({ label: i.toString().padStart(2, '0'), value: i })), []);
+  const hourItems = React.useMemo(() => Array.from({ length: 12 }, (_, i) => ({ label: (i + 1).toString().padStart(2, '0'), value: i + 1 })), []);
   const minuteItems = React.useMemo(() => Array.from({ length: 60 }, (_, i) => ({ label: i.toString().padStart(2, '0'), value: i })), []);
+  const meridiemItems = React.useMemo(() => [
+    { label: 'AM', value: 0 },
+    { label: 'PM', value: 1 },
+  ], []);
 
   useEffect(() => { loadAlarms(); }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const setupAlarmNotifications = async () => {
+      if (Platform.OS === 'web') {
+        if (active) {
+          setAlarmSupportNote('Alarms ring only while this screen is open on web.');
+        }
+        return;
+      }
+
+      if (isExpoGo) {
+        if (active) {
+          setAlarmSupportNote('Expo Go does not support background alarm notifications. Keep Clock open for in-app alarms.');
+        }
+        return;
+      }
+
+      const granted = await requestNotificationPermissions();
+      if (!active) return;
+
+      if (!granted) {
+        setAlarmSupportNote('Allow notifications to run alarms in background.');
+      } else {
+        setAlarmSupportNote(null);
+      }
+    };
+
+    setupAlarmNotifications();
+
+    return () => {
+      active = false;
+    };
+  }, [isExpoGo]);
+
+  useEffect(() => {
+    alarms.forEach((alarm) => {
+      if (alarm.is_enabled) {
+        scheduleAlarmReminders(alarm).catch(() => { });
+      } else {
+        cancelAlarmReminders(alarm.id).catch(() => { });
+      }
+    });
+  }, [alarms]);
+
+  const clearSnoozeTimeoutForAlarm = useCallback((alarmId: number) => {
+    const timeoutId = snoozeTimeoutsRef.current[alarmId];
+    if (!timeoutId) return;
+    clearTimeout(timeoutId);
+    delete snoozeTimeoutsRef.current[alarmId];
+  }, []);
+
+  const stopActiveAlarmSound = useCallback(async () => {
+    const sound = activeAlarmSoundRef.current;
+    activeAlarmSoundRef.current = null;
+    if (!sound) return;
+
+    try {
+      await sound.stopAsync();
+    } catch { }
+
+    try {
+      await sound.unloadAsync();
+    } catch { }
+  }, []);
+
+  const stopActiveAlarmVibration = useCallback(() => {
+    if (Platform.OS === 'web') return;
+    try {
+      Vibration.cancel();
+    } catch { }
+  }, []);
+
+  const clearActiveRingingUI = useCallback(() => {
+    setShowRingingAlarmModal(false);
+    setActiveRingingAlarm(null);
+  }, []);
+
+  const stopAlarmNow = useCallback(async () => {
+    await stopActiveAlarmSound();
+    stopActiveAlarmVibration();
+  }, [stopActiveAlarmSound, stopActiveAlarmVibration]);
+
+  const playCustomAlarmSound = useCallback(async (alarm: Alarm): Promise<boolean> => {
+    const toneName = (alarm.sound_name || '').toLowerCase();
+    if (toneName === 'vibrate only') return false;
+    if (!alarm.sound_uri) return false;
+
+    const AV = getAudioModule();
+    if (!AV?.Audio?.Sound?.createAsync) return false;
+
+    await stopActiveAlarmSound();
+
+    try {
+      await AV.Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+      });
+    } catch { }
+
+    try {
+      const { sound } = await AV.Audio.Sound.createAsync(
+        { uri: alarm.sound_uri },
+        {
+          shouldPlay: true,
+          isLooping: true,
+          volume: 1.0,
+        }
+      );
+
+      activeAlarmSoundRef.current = sound;
+      return true;
+    } catch {
+      return false;
+    }
+  }, [stopActiveAlarmSound]);
+
+  const ringAlarm = useCallback(async (alarm: Alarm, source: 'auto' | 'notification' | 'snooze' = 'auto') => {
+    await stopAlarmNow();
+
+    setMode('alarm');
+    setIsFullscreen(false);
+    setShowControls(true);
+    setActiveRingingAlarm(alarm);
+    setShowRingingAlarmModal(true);
+
+    if (Platform.OS !== 'web') {
+      try {
+        const Haptics = getHapticsModule();
+        if (Haptics?.notificationAsync) {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        }
+      } catch { }
+
+      if (alarm.vibrate) {
+        try {
+          Vibration.vibrate([0, 800, 600], true);
+        } catch { }
+      }
+    }
+
+    const playedCustomSound = await playCustomAlarmSound(alarm);
+    const alarmMessage = alarm.label?.trim() || 'Alarm time';
+
+    if (!playedCustomSound && !isExpoGo && Platform.OS !== 'web' && source !== 'notification') {
+      const Notifications = getNotificationsModule();
+      if (Notifications?.scheduleNotificationAsync) {
+        try {
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: '⏰ Alarm',
+              body: alarmMessage,
+              data: { type: 'alarm', alarmId: alarm.id, alarmLabel: alarmMessage },
+              categoryIdentifier: ALARM_NOTIFICATION_CATEGORY_ID,
+              sound: true,
+            },
+            trigger: null,
+          });
+        } catch { }
+      }
+    }
+
+    if (!alarm.repeat_days || alarm.repeat_days.length === 0) {
+      try {
+        await updateAlarm(alarm.id, { is_enabled: false });
+      } catch { }
+    }
+  }, [isExpoGo, playCustomAlarmSound, stopAlarmNow, updateAlarm]);
+
+  const scheduleSnoozeAlarm = useCallback(async (alarm: Alarm) => {
+    clearSnoozeTimeoutForAlarm(alarm.id);
+
+    const snoozeMs = ALARM_SNOOZE_MINUTES * 60 * 1000;
+
+    if (Platform.OS === 'web' || isExpoGo) {
+      snoozeTimeoutsRef.current[alarm.id] = setTimeout(() => {
+        ringAlarm(alarm, 'snooze').catch(() => { });
+      }, snoozeMs);
+      return;
+    }
+
+    const Notifications = getNotificationsModule();
+    if (!Notifications?.scheduleNotificationAsync) return;
+
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '⏰ Snoozed Alarm',
+          body: alarm.label?.trim() || 'Alarm time',
+          data: { type: 'alarm', alarmId: alarm.id, snoozed: true },
+          categoryIdentifier: ALARM_NOTIFICATION_CATEGORY_ID,
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: new Date(Date.now() + snoozeMs),
+          channelId: ALARM_CHANNEL_ID,
+        },
+      });
+    } catch { }
+  }, [clearSnoozeTimeoutForAlarm, isExpoGo, ringAlarm]);
+
+  const handleStopAlarm = useCallback(async () => {
+    await stopAlarmNow();
+    clearActiveRingingUI();
+  }, [clearActiveRingingUI, stopAlarmNow]);
+
+  const handleSnoozeAlarm = useCallback(async () => {
+    if (!activeRingingAlarm) return;
+
+    const alarmToSnooze = activeRingingAlarm;
+    await stopAlarmNow();
+    clearActiveRingingUI();
+    await scheduleSnoozeAlarm(alarmToSnooze);
+
+    if (Platform.OS === 'web') {
+      window.alert(`Alarm snoozed for ${ALARM_SNOOZE_MINUTES} minutes.`);
+    }
+  }, [activeRingingAlarm, clearActiveRingingUI, scheduleSnoozeAlarm, stopAlarmNow]);
+
+  useEffect(() => {
+    return () => {
+      stopAlarmNow().catch(() => { });
+      Object.keys(snoozeTimeoutsRef.current).forEach((alarmId) => {
+        clearSnoozeTimeoutForAlarm(Number(alarmId));
+      });
+    };
+  }, [clearSnoozeTimeoutForAlarm, stopAlarmNow]);
+
+  useEffect(() => {
+    const alarmIdRaw = normalizeParamValue(params.alarmId);
+    if (!alarmIdRaw) return;
+
+    const alarmAction = normalizeParamValue(params.alarmAction) || 'open';
+    const alarmTrigger = normalizeParamValue(params.alarmTrigger) || '';
+    const dedupeKey = `${alarmIdRaw}:${alarmAction}:${alarmTrigger}`;
+    if (lastHandledNotificationRef.current === dedupeKey) return;
+
+    const alarmId = Number(alarmIdRaw);
+    if (!Number.isFinite(alarmId)) return;
+
+    const alarm = alarms.find((item) => item.id === alarmId);
+    if (!alarm) return;
+
+    lastHandledNotificationRef.current = dedupeKey;
+
+    if (alarmAction === ALARM_ACTION_STOP) {
+      handleStopAlarm().catch(() => { });
+      return;
+    }
+
+    if (alarmAction === ALARM_ACTION_SNOOZE) {
+      scheduleSnoozeAlarm(alarm).catch(() => { });
+      return;
+    }
+
+    ringAlarm(alarm, 'notification').catch(() => { });
+  }, [
+    alarms,
+    handleStopAlarm,
+    params.alarmAction,
+    params.alarmId,
+    params.alarmTrigger,
+    ringAlarm,
+    scheduleSnoozeAlarm,
+  ]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const current = new Date();
+      const hh = current.getHours();
+      const mm = current.getMinutes();
+      const weekday = current.getDay();
+      const minuteKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+
+      alarms.forEach((alarm) => {
+        if (!alarm.is_enabled) return;
+        if (alarm.hour !== hh || alarm.minute !== mm) return;
+        if (alarm.repeat_days && alarm.repeat_days.length > 0 && !alarm.repeat_days.includes(weekday)) return;
+        if (lastAlarmTriggerRef.current[alarm.id] === minuteKey) return;
+
+        lastAlarmTriggerRef.current[alarm.id] = minuteKey;
+        ringAlarm(alarm).catch(() => { });
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [alarms, ringAlarm]);
 
   // Clock tick
   useEffect(() => {
@@ -391,17 +805,46 @@ export default function ClockScreen() {
 
   const addLap = () => { setLaps(prev => [swElapsed, ...prev]); };
 
+  const clearLaps = () => setLaps([]);
+
   /* ── Alarms ── */
   const handleImportCustomTone = async () => {
     try {
+      const DocumentPicker = getDocumentPickerModule();
+      if (!DocumentPicker?.getDocumentAsync) {
+        Alert.alert('Unavailable', 'Custom tone import is not available in this build.');
+        return;
+      }
+
       const result = await DocumentPicker.getDocumentAsync({
         type: 'audio/*',
         copyToCacheDirectory: true,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        const sourceUri = asset.uri;
+        let persistedUri = sourceUri;
+
+        const FileSystem = getFileSystemModule();
+        if (FileSystem?.documentDirectory && FileSystem.copyAsync && sourceUri) {
+          const dir = `${FileSystem.documentDirectory}alarm-tones`;
+          try {
+            await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+          } catch { }
+
+          const safeName = (asset.name || `tone-${Date.now()}.mp3`).replace(/[^a-zA-Z0-9._-]/g, '_');
+          const targetUri = `${dir}/${Date.now()}-${safeName}`;
+
+          try {
+            await FileSystem.copyAsync({ from: sourceUri, to: targetUri });
+            persistedUri = targetUri;
+          } catch {
+            // Keep original URI as fallback.
+          }
+        }
+
         setCustomToneName(asset.name || 'Custom Tone');
-        setCustomToneUri(asset.uri);
+        setCustomToneUri(persistedUri);
         setAlarmTone('custom');
       }
     } catch (e) {
@@ -409,34 +852,98 @@ export default function ClockScreen() {
     }
   };
 
+  const resetAlarmForm = () => {
+    setAlarmLabel('');
+    setAlarmHour12(7);
+    setAlarmMeridiem(0);
+    setAlarmMinute(0);
+    setAlarmDays([]);
+    setAlarmTone('default');
+    setCustomToneName('');
+    setCustomToneUri('');
+    setEditingAlarmId(null);
+  };
+
+  const openCreateAlarm = () => {
+    resetAlarmForm();
+    setShowAlarmModal(true);
+  };
+
+  const openEditAlarm = (alarm: typeof alarms[number]) => {
+    const { hour12, meridiem } = toTwelveHourParts(alarm.hour);
+
+    setEditingAlarmId(alarm.id);
+    setAlarmHour12(hour12);
+    setAlarmMeridiem(meridiem);
+    setAlarmMinute(alarm.minute);
+    setAlarmLabel(alarm.label || '');
+    setAlarmDays(alarm.repeat_days || []);
+
+    if (alarm.sound_uri) {
+      setAlarmTone('custom');
+      setCustomToneUri(alarm.sound_uri);
+      setCustomToneName(alarm.sound_name || 'Custom Tone');
+    } else {
+      const tone = ALARM_TONES.find(t => t.name.toLowerCase() === (alarm.sound_name || '').toLowerCase());
+      setAlarmTone(tone?.id || 'default');
+      setCustomToneName('');
+      setCustomToneUri('');
+    }
+
+    setShowAlarmModal(true);
+  };
+
   const handleSaveAlarm = async () => {
-    const isCustom = alarmTone === 'custom' && customToneUri;
-    await addAlarm({
-      hour: alarmHour,
+    const isCustom = alarmTone === 'custom' && !!customToneUri;
+    const hour = toTwentyFourHour(alarmHour12, alarmMeridiem);
+
+    const payload: CreateAlarmInput = {
+      hour,
       minute: alarmMinute,
       label: alarmLabel.trim() || undefined,
       repeat_days: alarmDays,
       vibrate: true,
       sound_name: isCustom ? customToneName : (ALARM_TONES.find(t => t.id === alarmTone)?.name || 'Default'),
       sound_uri: isCustom ? customToneUri : undefined,
-    });
-    setShowAlarmModal(false);
-    setAlarmLabel('');
-    setAlarmHour(7);
-    setAlarmMinute(0);
-    setAlarmDays([]);
-    setAlarmTone('default');
-    setCustomToneName('');
-    setCustomToneUri('');
+    };
+
+    try {
+      if (editingAlarmId) {
+        await updateAlarm(editingAlarmId, payload);
+      } else {
+        await addAlarm(payload);
+      }
+      setShowAlarmModal(false);
+      resetAlarmForm();
+    } catch (e: any) {
+      Alert.alert('Alarm', e?.message || 'Failed to save alarm');
+    }
+  };
+
+  const handleToggleAlarm = async (id: number) => {
+    try {
+      await toggleAlarm(id);
+    } catch (e: any) {
+      Alert.alert('Alarm', e?.message || 'Failed to update alarm');
+    }
   };
 
   const handleDeleteAlarm = (id: number) => {
+    const deleteAndCancel = async () => {
+      try {
+        await deleteAlarm(id);
+        await cancelAlarmReminders(id);
+      } catch (e: any) {
+        Alert.alert('Alarm', e?.message || 'Failed to delete alarm');
+      }
+    };
+
     if (Platform.OS === 'web') {
-      if (window.confirm('Delete this alarm?')) deleteAlarm(id);
+      if (window.confirm('Delete this alarm?')) deleteAndCancel();
     } else {
       Alert.alert('Delete', 'Delete this alarm?', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteAlarm(id) },
+        { text: 'Delete', style: 'destructive', onPress: deleteAndCancel },
       ]);
     }
   };
@@ -504,6 +1011,19 @@ export default function ClockScreen() {
       controlsTimeout.current = setTimeout(() => setShowControls(false), 3000);
       return () => { if (controlsTimeout.current) clearTimeout(controlsTimeout.current); };
     }
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    if (!isFullscreen) {
+      void lockOrientationSafe('default');
+      return;
+    }
+
+    void lockOrientationSafe('landscape');
+
+    return () => {
+      void lockOrientationSafe('default');
+    };
   }, [isFullscreen]);
 
   return (
@@ -633,7 +1153,12 @@ export default function ClockScreen() {
             </View>
             {laps.length > 0 && (
               <View style={[styles.lapSection, { borderColor: tc.border }]}>
-                <Text style={[styles.lapHeader, { color: tc.textSecondary }]}>Laps</Text>
+                <View style={styles.lapHeaderRow}>
+                  <Text style={[styles.lapHeader, { color: tc.textSecondary }]}>Laps</Text>
+                  <TouchableOpacity onPress={clearLaps}>
+                    <Text style={[styles.clearLapsText, { color: tc.primary }]}>Clear</Text>
+                  </TouchableOpacity>
+                </View>
                 {laps.map((lap, i) => (
                   <View key={i} style={[styles.lapRow, { borderColor: tc.border }]}>
                     <Text style={[styles.lapNum, { color: tc.textSecondary }]}>Lap {laps.length - i}</Text>
@@ -648,6 +1173,13 @@ export default function ClockScreen() {
         {/* Alarm List */}
         {mode === 'alarm' && (
           <View style={styles.alarmSection}>
+            {alarmSupportNote && (
+              <View style={[styles.alarmNotice, { borderColor: tc.warning + '55', backgroundColor: tc.warning + '18' }]}>
+                <MaterialIcons name="info-outline" size={16} color={tc.warning} />
+                <Text style={[styles.alarmNoticeText, { color: tc.textSecondary }]}>{alarmSupportNote}</Text>
+              </View>
+            )}
+
             {alarms.length === 0 ? (
               <View style={styles.emptyState}>
                 <MaterialIcons name="alarm" size={56} color={tc.border} />
@@ -658,7 +1190,7 @@ export default function ClockScreen() {
                 <View key={alarm.id} style={[styles.alarmCard, { backgroundColor: tc.cardBackground }]}>
                   <View style={styles.alarmLeft}>
                     <Text style={[styles.alarmTime, { color: alarm.is_enabled ? tc.textPrimary : tc.textSecondary }]}>
-                      {pad(alarm.hour)}:{pad(alarm.minute)}
+                      {formatAlarmTime12(alarm.hour, alarm.minute)}
                     </Text>
                     {alarm.label && (
                       <Text style={[styles.alarmLabel, { color: tc.textSecondary }]}>{alarm.label}</Text>
@@ -688,16 +1220,21 @@ export default function ClockScreen() {
                   <View style={styles.alarmRight}>
                     <TouchableOpacity
                       style={[styles.toggleBtn, { backgroundColor: alarm.is_enabled ? tc.primary : tc.border }]}
-                      onPress={() => toggleAlarm(alarm.id)}
+                      onPress={() => handleToggleAlarm(alarm.id)}
                     >
                       <View style={[
                         styles.toggleKnob,
                         alarm.is_enabled ? { transform: [{ translateX: 18 }] } : {},
                       ]} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDeleteAlarm(alarm.id)} hitSlop={8}>
-                      <MaterialIcons name="delete-outline" size={18} color={tc.textSecondary} />
-                    </TouchableOpacity>
+                    <View style={styles.alarmActions}>
+                      <TouchableOpacity onPress={() => openEditAlarm(alarm)} hitSlop={8}>
+                        <MaterialIcons name="edit" size={18} color={tc.textSecondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteAlarm(alarm.id)} hitSlop={8}>
+                        <MaterialIcons name="delete-outline" size={18} color={tc.textSecondary} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               ))
@@ -705,7 +1242,7 @@ export default function ClockScreen() {
 
             <TouchableOpacity
               style={[styles.addAlarmBtn, { backgroundColor: tc.primary }]}
-              onPress={() => setShowAlarmModal(true)}
+              onPress={openCreateAlarm}
             >
               <MaterialIcons name="add-alarm" size={22} color="#FFF" />
               <Text style={styles.addAlarmBtnText}>Add Alarm</Text>
@@ -723,24 +1260,27 @@ export default function ClockScreen() {
             {(() => {
               // Calculate digit sizing based on current window dimensions
               const isLandscape = winW > winH;
-              // Total horizontal space: 6 digits + 2 separators (~25px each) + margins
-              const sepSpace = 2 * 30;
-              const margins = 40;
-              const availW = winW - sepSpace - margins;
+              const rowHorizontalPadding = isLandscape ? 20 : 14;
+              const digitMargin = isLandscape ? 2 : 1;
+              const separatorWidth = isLandscape ? 26 : 22;
+              const availW = Math.max(
+                220,
+                winW - rowHorizontalPadding * 2 - separatorWidth * 2 - digitMargin * 2 * 6,
+              );
               const maxDigitW = Math.floor(availW / 6);
               // Also cap by height so digits don't overflow vertically
-              const maxByHeight = Math.floor((winH - 120) / 1.5);
-              const fsDigitW = Math.min(maxDigitW, maxByHeight, isLandscape ? 180 : 120);
-              const fsDotSize = Math.max(8, Math.floor(fsDigitW / 10));
+              const maxByHeight = Math.floor((winH - (isLandscape ? 72 : 160)) / 1.5);
+              const fsDigitW = Math.max(34, Math.min(maxDigitW, maxByHeight));
+              const fsDotSize = Math.max(6, Math.floor(fsDigitW / 9));
               return (
                 <>
                   <View style={styles.fullscreenDigitRow}>
                     <FlipDigit value={digits[0]} prevValue={prevDigitsRef.current[0]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
                     <FlipDigit value={digits[1]} prevValue={prevDigitsRef.current[1]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
-                    <Sep color={digitColor} size="fullscreen" overrideDotSize={fsDotSize} />
+                    <Sep color={digitColor} size="fullscreen" overrideDotSize={fsDotSize} overrideWidth={separatorWidth} />
                     <FlipDigit value={digits[2]} prevValue={prevDigitsRef.current[2]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
                     <FlipDigit value={digits[3]} prevValue={prevDigitsRef.current[3]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
-                    <Sep color={digitColor} size="fullscreen" overrideDotSize={fsDotSize} />
+                    <Sep color={digitColor} size="fullscreen" overrideDotSize={fsDotSize} overrideWidth={separatorWidth} />
                     <FlipDigit value={digits[4]} prevValue={prevDigitsRef.current[4]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
                     <FlipDigit value={digits[5]} prevValue={prevDigitsRef.current[5]} color={digitColor} size="fullscreen" overrideWidth={fsDigitW} />
                   </View>
@@ -762,22 +1302,68 @@ export default function ClockScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* Active Alarm Modal */}
+      <Modal
+        visible={showRingingAlarmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          handleStopAlarm().catch(() => { });
+        }}
+      >
+        <View style={styles.ringingOverlay}>
+          <View style={[styles.ringingCard, { backgroundColor: tc.cardBackground }]}> 
+            <MaterialIcons name="alarm" size={44} color={tc.primary} />
+            <Text style={[styles.ringingTitle, { color: tc.textPrimary }]}>Alarm Ringing</Text>
+            <Text style={[styles.ringingTime, { color: tc.textPrimary }]}>
+              {activeRingingAlarm ? formatAlarmTime12(activeRingingAlarm.hour, activeRingingAlarm.minute) : '--:--'}
+            </Text>
+            <Text style={[styles.ringingLabel, { color: tc.textSecondary }]}>
+              {activeRingingAlarm?.label?.trim() || 'Alarm time'}
+            </Text>
+
+            <View style={styles.ringingActionsRow}>
+              <TouchableOpacity
+                style={[styles.ringingActionBtn, { backgroundColor: tc.warning }]}
+                onPress={() => {
+                  handleSnoozeAlarm().catch(() => { });
+                }}
+              >
+                <MaterialIcons name="snooze" size={18} color="#FFF" />
+                <Text style={styles.ringingActionText}>Snooze {ALARM_SNOOZE_MINUTES}m</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.ringingActionBtn, { backgroundColor: tc.danger }]}
+                onPress={() => {
+                  handleStopAlarm().catch(() => { });
+                }}
+              >
+                <MaterialIcons name="alarm-off" size={18} color="#FFF" />
+                <Text style={styles.ringingActionText}>Stop</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Alarm Create Modal */}
       <Modal visible={showAlarmModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: tc.cardBackground }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: tc.textPrimary }]}>New Alarm</Text>
-              <TouchableOpacity onPress={() => setShowAlarmModal(false)}>
+              <Text style={[styles.modalTitle, { color: tc.textPrimary }]}>{editingAlarmId ? 'Edit Alarm' : 'New Alarm'}</Text>
+              <TouchableOpacity onPress={() => { setShowAlarmModal(false); resetAlarmForm(); }}>
                 <MaterialIcons name="close" size={24} color={tc.textSecondary} />
               </TouchableOpacity>
             </View>
 
             {/* Time Picker - Scroll Drums */}
             <View style={styles.timePickerRow}>
-              <ScrollPicker items={hourItems} selected={alarmHour} onChange={setAlarmHour} tc={tc} />
+              <ScrollPicker items={hourItems} selected={alarmHour12} onChange={setAlarmHour12} tc={tc} />
               <Text style={[styles.timeSep, { color: tc.textPrimary }]}>:</Text>
               <ScrollPicker items={minuteItems} selected={alarmMinute} onChange={setAlarmMinute} tc={tc} />
+              <ScrollPicker items={meridiemItems} selected={alarmMeridiem} onChange={setAlarmMeridiem} tc={tc} width={90} />
             </View>
 
             <TextInput
@@ -852,7 +1438,7 @@ export default function ClockScreen() {
             </View>
 
             <TouchableOpacity style={[styles.saveBtn, { backgroundColor: tc.primary }]} onPress={handleSaveAlarm}>
-              <Text style={styles.saveBtnText}>Save Alarm</Text>
+              <Text style={styles.saveBtnText}>{editingAlarmId ? 'Update Alarm' : 'Save Alarm'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -893,6 +1479,8 @@ const styles = StyleSheet.create({
   fullscreenDigitRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    maxWidth: '100%',
+    paddingHorizontal: 12,
   },
   fullscreenDate: {
     marginTop: 24,
@@ -925,11 +1513,28 @@ const styles = StyleSheet.create({
     elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
   },
   lapSection: { width: '100%', marginTop: 24, borderTopWidth: 1, paddingTop: 12 },
-  lapHeader: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any, marginBottom: 8 },
+  lapHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  lapHeader: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any },
+  clearLapsText: { fontSize: typography.sizes.xs, fontWeight: typography.weights.semiBold as any },
   lapRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   lapNum: { fontSize: typography.sizes.sm },
   lapTime: { fontSize: typography.sizes.sm, fontVariant: ['tabular-nums'] },
   alarmSection: { paddingTop: 16 },
+  alarmNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  alarmNoticeText: {
+    flex: 1,
+    fontSize: typography.sizes.xs,
+    lineHeight: 16,
+  },
   alarmCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 12 },
   alarmLeft: { flex: 1 },
   alarmTime: { fontSize: 32, fontWeight: '700', fontVariant: ['tabular-nums'] },
@@ -937,6 +1542,7 @@ const styles = StyleSheet.create({
   dayRow: { flexDirection: 'row', gap: 6, marginTop: 6 },
   dayLabel: { fontSize: typography.sizes.xs, fontWeight: typography.weights.semiBold as any },
   alarmRight: { alignItems: 'flex-end', gap: 12 },
+  alarmActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   toggleBtn: { width: 44, height: 26, borderRadius: 13, justifyContent: 'center', paddingHorizontal: 3 },
   toggleKnob: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFF' },
   addAlarmBtn: {
@@ -946,6 +1552,55 @@ const styles = StyleSheet.create({
   addAlarmBtnText: { color: '#FFF', fontSize: typography.sizes.md, fontWeight: typography.weights.bold as any },
   emptyState: { alignItems: 'center', paddingTop: 60 },
   emptyText: { marginTop: 12, fontSize: typography.sizes.md },
+  ringingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  ringingCard: {
+    width: '100%',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    alignItems: 'center',
+    gap: 10,
+  },
+  ringingTitle: {
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold as any,
+  },
+  ringingTime: {
+    fontSize: 42,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  ringingLabel: {
+    fontSize: typography.sizes.md,
+    textAlign: 'center',
+  },
+  ringingActionsRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 8,
+  },
+  ringingActionBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  ringingActionText: {
+    color: '#FFF',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold as any,
+  },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },

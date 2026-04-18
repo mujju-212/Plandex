@@ -1,8 +1,11 @@
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useGamificationStore } from '../../stores/useGamificationStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useThemeStore } from '../../stores/useThemeStore';
 import { typography } from '../../theme/typography';
@@ -17,6 +20,30 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
     const router = useRouter();
     const { isDark, toggleTheme, colors: tc } = useThemeStore();
     const { notificationsEnabled, toggleNotifications } = useSettingsStore();
+    const { currentLevel, levelTitle, loadStats } = useGamificationStore();
+    const [profileName, setProfileName] = useState('User');
+    const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+
+    const loadProfile = useCallback(async () => {
+        try {
+            const [name, photo] = await Promise.all([
+                AsyncStorage.getItem('profile_name'),
+                AsyncStorage.getItem('profile_photo_uri'),
+            ]);
+            setProfileName(name?.trim() ? name : 'User');
+            setProfilePhoto(photo || null);
+        } catch {
+            setProfileName('User');
+            setProfilePhoto(null);
+        }
+        loadStats();
+    }, [loadStats]);
+
+    useEffect(() => {
+        if (visible) {
+            loadProfile();
+        }
+    }, [visible, loadProfile]);
 
     const navigate = (path: string) => {
         onClose();
@@ -39,11 +66,29 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
         } catch (e: any) { }
     };
 
-    const handleClear = () => {
-        if (typeof window !== 'undefined' && window.confirm('Delete ALL data? This cannot be undone.')) {
-            clearAllData();
+    const clearAll = async () => {
+        try {
+            await clearAllData();
             onClose();
+        } catch {
+            Alert.alert('Error', 'Failed to clear data. Please try again.');
         }
+    };
+
+    const handleClear = () => {
+        const message = 'Delete ALL data? This cannot be undone.';
+
+        if (Platform.OS === 'web') {
+            if (typeof window !== 'undefined' && typeof window.confirm === 'function' && window.confirm(message)) {
+                void clearAll();
+            }
+            return;
+        }
+
+        Alert.alert('Clear All Data', message, [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: () => { void clearAll(); } },
+        ]);
     };
 
     return (
@@ -54,10 +99,13 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
                     {/* Profile Header */}
                     <LinearGradient colors={[tc.gradientStart, tc.gradientEnd]} style={styles.profileSection} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                         <View style={styles.avatarCircle}>
-                            <Text style={styles.avatarText}>M</Text>
+                            {profilePhoto
+                                ? <Image source={{ uri: profilePhoto }} style={styles.avatarImage} contentFit="cover" />
+                                : <Text style={styles.avatarText}>{profileName.charAt(0).toUpperCase()}</Text>
+                            }
                         </View>
-                        <Text style={styles.profileName}>Mujju</Text>
-                        <Text style={styles.profileLevel}>Level 1 · Beginner</Text>
+                        <Text style={styles.profileName}>{profileName}</Text>
+                        <Text style={styles.profileLevel}>Level {currentLevel} · {levelTitle}</Text>
                     </LinearGradient>
 
                     <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
@@ -124,9 +172,10 @@ function SidebarItem({ icon, label, onPress, tc, danger }: { icon: string; label
 const styles = StyleSheet.create({
     overlay: { flex: 1, flexDirection: 'row' },
     backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-    drawer: { position: 'absolute' as const, left: 0, top: 0, bottom: 0, width: 280, elevation: 10, shadowColor: '#000', shadowOffset: { width: 4, height: 0 }, shadowOpacity: 0.3, shadowRadius: 10 },
+    drawer: { position: 'absolute' as const, left: 0, top: 0, bottom: 0, width: 280, elevation: 6, shadowColor: '#000', shadowOffset: { width: 3, height: 0 }, shadowOpacity: 0.12, shadowRadius: 8 },
     profileSection: { paddingTop: 50, paddingBottom: 24, paddingHorizontal: 24, gap: 4 },
     avatarCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: 8 },
+    avatarImage: { width: 48, height: 48, borderRadius: 24 },
     avatarText: { fontSize: 20, fontWeight: '700' as any, color: '#FFF' },
     profileName: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any, color: '#FFF' },
     profileLevel: { fontSize: typography.sizes.xs, color: 'rgba(255,255,255,0.7)' },
