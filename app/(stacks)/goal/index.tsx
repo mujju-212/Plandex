@@ -3,6 +3,7 @@ import { differenceInDays } from 'date-fns';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import EmptyState from '../../../src/components/common/EmptyState';
 import { useGoalStore } from '../../../src/stores/useGoalStore';
 import { useThemeStore } from '../../../src/stores/useThemeStore';
 import { typography } from '../../../src/theme/typography';
@@ -89,13 +90,14 @@ export default function GoalListScreen() {
 
         {filtered.length === 0 ? (
           <View style={styles.empty}>
-            <MaterialIcons name="flag" size={48} color={tc.border} />
-            <Text style={[styles.emptyTitle, { color: tc.textSecondary }]}>
-              {filter === 'all' ? 'No goals yet' : `No ${filter === 'in_progress' ? 'active' : filter} goals`}
-            </Text>
-            <Pressable onPress={() => router.push('/goal/create')}>
-              <Text style={[styles.emptyLink, { color: tc.primary }]}>+ Set a Goal</Text>
-            </Pressable>
+            <EmptyState
+              icon="flag"
+              variant="compact"
+              title={filter === 'all' ? 'No goals yet' : `No ${filter === 'in_progress' ? 'active' : filter} goals`}
+              message="Create a goal to stay focused and track progress."
+              ctaLabel="Create goal"
+              onCtaPress={() => router.push('/goal/create')}
+            />
           </View>
         ) : (
           filtered.map(goal => {

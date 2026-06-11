@@ -2,6 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import EmptyState from '../../../src/components/common/EmptyState';
 import { useHabitStore } from '../../../src/stores/useHabitStore';
 import { useThemeStore } from '../../../src/stores/useThemeStore';
 import { typography } from '../../../src/theme/typography';
@@ -101,13 +102,14 @@ export default function HabitListScreen() {
 
         {filtered.length === 0 ? (
           <View style={styles.empty}>
-            <MaterialIcons name="repeat" size={48} color={tc.border} />
-            <Text style={[styles.emptyTitle, { color: tc.textSecondary }]}>
-              {filter === 'all' ? 'No habits yet' : `No ${filter} habits`}
-            </Text>
-            <Pressable onPress={() => router.push('/habit/create')}>
-              <Text style={[styles.emptyLink, { color: tc.primary }]}>+ Build a Habit</Text>
-            </Pressable>
+            <EmptyState
+              icon="repeat"
+              variant="compact"
+              title={filter === 'all' ? 'No habits yet' : `No ${filter} habits`}
+              message="Create a habit and start building your streak."
+              ctaLabel="Create habit"
+              onCtaPress={() => router.push('/habit/create')}
+            />
           </View>
         ) : (
           filtered.map(habit => {

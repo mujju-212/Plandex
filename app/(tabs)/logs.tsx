@@ -4,7 +4,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import EmptyState from '../../src/components/common/EmptyState';
 import Sidebar from '../../src/components/common/Sidebar';
+import Tag from '../../src/components/common/Tag';
 import { useLogStore } from '../../src/stores/useLogStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { colors } from '../../src/theme/colors';
@@ -229,54 +231,44 @@ export default function DailyLogScreen() {
           {/* Filter Chips */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterContent}>
             {/* Date Range Filters */}
-            <Pressable
-              style={[styles.filterChip, { backgroundColor: filterDateRange === 'all' ? tc.primary : tc.cardBackground }]}
-              onPress={() => setFilterDateRange('all')}
-            >
-              <Text style={[styles.filterChipText, { color: filterDateRange === 'all' ? '#FFF' : tc.textSecondary }]}>All Time</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.filterChip, { backgroundColor: filterDateRange === 'week' ? tc.primary : tc.cardBackground }]}
-              onPress={() => setFilterDateRange('week')}
-            >
-              <Text style={[styles.filterChipText, { color: filterDateRange === 'week' ? '#FFF' : tc.textSecondary }]}>This Week</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.filterChip, { backgroundColor: filterDateRange === 'month' ? tc.primary : tc.cardBackground }]}
-              onPress={() => setFilterDateRange('month')}
-            >
-              <Text style={[styles.filterChipText, { color: filterDateRange === 'month' ? '#FFF' : tc.textSecondary }]}>This Month</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.filterChip, { backgroundColor: filterDateRange === 'year' ? tc.primary : tc.cardBackground }]}
-              onPress={() => setFilterDateRange('year')}
-            >
-              <Text style={[styles.filterChipText, { color: filterDateRange === 'year' ? '#FFF' : tc.textSecondary }]}>This Year</Text>
-            </Pressable>
+            <Tag label="All Time" variant="chip" selected={filterDateRange === 'all'} onPress={() => setFilterDateRange('all')} />
+            <Tag label="This Week" variant="chip" selected={filterDateRange === 'week'} onPress={() => setFilterDateRange('week')} />
+            <Tag label="This Month" variant="chip" selected={filterDateRange === 'month'} onPress={() => setFilterDateRange('month')} />
+            <Tag label="This Year" variant="chip" selected={filterDateRange === 'year'} onPress={() => setFilterDateRange('year')} />
             
             {/* Mood Filters */}
             {MOODS.map(m => (
-              <Pressable
+              <Tag
                 key={m.key}
-                style={[styles.filterChip, { backgroundColor: filterMood === m.key ? tc.primary : tc.cardBackground }]}
+                label={`${m.emoji} ${m.label}`}
+                variant="chip"
+                selected={filterMood === m.key}
                 onPress={() => setFilterMood(filterMood === m.key ? null : m.key)}
-              >
-                <Text style={styles.filterEmoji}>{m.emoji}</Text>
-                <Text style={[styles.filterChipText, { color: filterMood === m.key ? '#FFF' : tc.textSecondary }]}>{m.label}</Text>
-              </Pressable>
+              />
             ))}
           </ScrollView>
 
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {pastLogs.length === 0 ? (
             <View style={styles.emptyHistory}>
-              <MaterialIcons name="event-note" size={64} color={tc.border} />
-              <Text style={[styles.emptyText, { color: tc.textSecondary }]}>
-                {searchQuery || filterMood || filterDateRange !== 'all' ? 'No logs found matching your filters.' : 'No past logs yet.'}
-              </Text>
-              <Text style={[styles.emptyText, { color: tc.textSecondary }]}>
-                {searchQuery || filterMood || filterDateRange !== 'all' ? 'Try adjusting your filters.' : 'Start writing in the "Write" tab!'}
-              </Text>
+              <EmptyState
+                icon="event-note"
+                variant="compact"
+                title={searchQuery || filterMood || filterDateRange !== 'all' ? 'No results' : 'No past logs yet'}
+                message={searchQuery || filterMood || filterDateRange !== 'all'
+                  ? 'Try adjusting your search or filters.'
+                  : 'Start writing in the “Write” tab to build your history.'}
+                ctaLabel={searchQuery || filterMood || filterDateRange !== 'all' ? 'Clear filters' : 'Go to Write'}
+                onCtaPress={() => {
+                  if (searchQuery || filterMood || filterDateRange !== 'all') {
+                    setSearchQuery('');
+                    setFilterMood(null);
+                    setFilterDateRange('all');
+                  } else {
+                    setActiveTab('write');
+                  }
+                }}
+              />
             </View>
           ) : (
             pastLogs.map(log => (
@@ -379,7 +371,4 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: typography.sizes.md, paddingVertical: 4 },
   filterRow: { marginBottom: 12 },
   filterContent: { paddingHorizontal: 20, gap: 8 },
-  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
-  filterChipText: { fontSize: typography.sizes.xs, fontWeight: typography.weights.medium as any },
-  filterEmoji: { fontSize: 14 },
 });

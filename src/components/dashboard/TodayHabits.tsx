@@ -35,7 +35,7 @@ export default function TodayHabits({ habits, completions, onToggle, onViewAll }
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <MaterialIcons name="loop" size={20} color={tc.primary} />
-            <Text style={[styles.title, { color: tc.textPrimary }]}>Today's Habits</Text>
+            <Text style={[styles.title, { color: tc.textPrimary }]}>Today{"'"}s Habits</Text>
           </View>
           <Pressable onPress={onViewAll} hitSlop={8}>
             <Text style={[styles.viewAll, { color: tc.primary }]}>View All</Text>
@@ -61,7 +61,7 @@ export default function TodayHabits({ habits, completions, onToggle, onViewAll }
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <MaterialIcons name="loop" size={20} color={tc.primary} />
-          <Text style={[styles.title, { color: tc.textPrimary }]}>Today's Habits</Text>
+          <Text style={[styles.title, { color: tc.textPrimary }]}>Today{"'"}s Habits</Text>
           <View style={[styles.countBadge, { backgroundColor: tc.success + '20' }]}>
             <Text style={[styles.countText, { color: tc.success }]}>{completedCount}/{activeHabits.length}</Text>
           </View>

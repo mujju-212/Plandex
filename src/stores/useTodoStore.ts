@@ -61,9 +61,9 @@ export const useTodoStore = create<TodoState>((set, get) => ({
     loadTodos: async (filter?: TodoFilter) => {
         try {
             set({ isLoading: true, error: null });
-            const mergedFilter = { ...get().filter, ...filter };
-            const todos = await todoService.getTodos(mergedFilter);
-            set({ todos, isLoading: false, filter: mergedFilter });
+            const effectiveFilter = filter ? { ...filter } : { exclude_archived: true };
+            const todos = await todoService.getTodos(effectiveFilter);
+            set({ todos, isLoading: false, filter: effectiveFilter });
         } catch (error: any) {
             set({ error: error.message, isLoading: false });
         }

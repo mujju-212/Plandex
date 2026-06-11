@@ -1,10 +1,11 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { format, isToday, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useThemeStore } from '../../stores/useThemeStore';
 import { typography } from '../../theme/typography';
 import { AppEvent } from '../../types/event.types';
+import { getEventOccurrenceStartDateTime, isEventOccurringOnDate } from '../../utils/dateUtils';
 
 type UpcomingEventsProps = {
   events: AppEvent[];
@@ -16,15 +17,16 @@ type UpcomingEventsProps = {
 
 export default function UpcomingEvents({ events, onEventPress, onViewAll }: UpcomingEventsProps) {
   const tc = useThemeStore().colors;
+  const todayDateStr = new Date().toISOString().slice(0, 10);
 
   // Filter to today's upcoming events, sorted by time
   const todayEvents = events
     .filter(e => {
       try {
-        return isToday(parseISO(e.start_datetime)) && e.status !== 'cancelled';
+        return e.status !== 'cancelled' && isEventOccurringOnDate(e, todayDateStr);
       } catch { return false; }
     })
-    .sort((a, b) => a.start_datetime.localeCompare(b.start_datetime))
+    .sort((a, b) => getEventOccurrenceStartDateTime(a, todayDateStr).localeCompare(getEventOccurrenceStartDateTime(b, todayDateStr)))
     .slice(0, 4);
 
   if (todayEvents.length === 0) {
@@ -69,8 +71,9 @@ export default function UpcomingEvents({ events, onEventPress, onViewAll }: Upco
         let timeText = 'All day';
         try {
           if (!event.is_all_day) {
-            timeText = format(parseISO(event.start_datetime), 'h:mm a');
-            if (event.end_datetime) {
+            const startDt = getEventOccurrenceStartDateTime(event, todayDateStr);
+            timeText = format(parseISO(startDt), 'h:mm a');
+            if (!event.is_recurring && event.end_datetime) {
               timeText += ' - ' + format(parseISO(event.end_datetime), 'h:mm a');
             }
           }

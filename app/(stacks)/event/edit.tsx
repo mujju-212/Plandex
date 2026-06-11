@@ -7,10 +7,12 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Card from '../../../src/components/common/Card';
 import { useEventStore } from '../../../src/stores/useEventStore';
+import { useSettingsStore } from '../../../src/stores/useSettingsStore';
 import { useThemeStore } from '../../../src/stores/useThemeStore';
 import { colors } from '../../../src/theme/colors';
 import { typography } from '../../../src/theme/typography';
 import { EventCategory } from '../../../src/types/event.types';
+import { formatTimeString, getEventOccurrenceStartDateTime, isEventOccurringOnDate } from '../../../src/utils/dateUtils';
 
 const CATEGORIES: { label: string; value: EventCategory; icon: string; color: string }[] = [
   { label: 'General', value: 'general', icon: 'event', color: '#1A73E8' },
@@ -22,19 +24,12 @@ const CATEGORIES: { label: string; value: EventCategory; icon: string; color: st
 
 const EVENT_COLORS = ['#1A73E8', '#E91E63', '#4CAF50', '#FF9800', '#9C27B0', '#00BCD4', '#FF5722', '#607D8B'];
 
-const formatDisplayTime = (value: string) => {
-  const [hours, minutes] = value.split(':').map(Number);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return value;
-  const date = new Date();
-  date.setHours(hours, minutes, 0, 0);
-  return format(date, 'h:mm a');
-};
-
 export default function EditEventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { isDark, colors: tc } = useThemeStore();
-  const { events, updateEvent } = useEventStore();
+  const { timeFormat } = useSettingsStore();
+  const { events, updateEvent, loadEvents } = useEventStore();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -57,6 +52,8 @@ export default function EditEventScreen() {
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [showRecurringEndPicker, setShowRecurringEndPicker] = useState(false);
   const [tempDate, setTempDate] = useState(new Date());
+
+  useEffect(() => { loadEvents(); }, [loadEvents]);
 
   useEffect(() => {
     if (id) {
@@ -112,6 +109,50 @@ export default function EditEventScreen() {
     try {
       const startDt = isAllDay ? `${startDate}T00:00:00` : `${startDate}T${startTime}:00`;
       const endDt = isAllDay ? `${endDate}T23:59:59` : `${endDate}T${endTime}:00`;
+
+      const newStartMs = new Date(startDt).getTime();
+      const newEndMs = new Date(endDt).getTime();
+      const currentId = Number(id);
+
+      const conflicts = events.filter((e) => {
+        if (e.id === currentId) return false;
+        if (e.status === 'cancelled') return false;
+
+        const startDateStr = startDt.slice(0, 10);
+        const endDateStr = endDt.slice(0, 10);
+        const otherStartDate = (e.start_datetime || '').slice(0, 10);
+        const otherEndDate = (e.end_datetime || e.start_datetime || '').slice(0, 10);
+
+        const dayOverlaps = !(endDateStr < otherStartDate || startDateStr > otherEndDate);
+        if (!dayOverlaps) return false;
+
+        const hasOccurrence = e.is_recurring ? isEventOccurringOnDate(e as any, startDateStr) : true;
+        if (!hasOccurrence) return false;
+
+        if (isAllDay || e.is_all_day) return true;
+
+        const otherStartDt = e.is_recurring ? getEventOccurrenceStartDateTime(e as any, startDateStr) : e.start_datetime;
+        const otherStartMs = new Date(otherStartDt).getTime();
+        const otherEndMs = new Date(e.end_datetime || otherStartDt).getTime();
+        if (!Number.isFinite(otherStartMs) || !Number.isFinite(otherEndMs)) return false;
+
+        return newStartMs < otherEndMs && newEndMs > otherStartMs;
+      });
+
+      if (conflicts.length > 0) {
+        const proceed = await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            'Schedule conflict',
+            `This overlaps with ${conflicts.length} existing event${conflicts.length === 1 ? '' : 's'}. Save anyway?`,
+            [
+              { text: 'Adjust', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Save', onPress: () => resolve(true) },
+            ],
+          );
+        });
+        if (!proceed) return;
+      }
+
       await updateEvent(Number(id), {
         title: title.trim(),
         description: description.trim() || undefined,
@@ -188,7 +229,7 @@ export default function EditEventScreen() {
               <input type="time" value={startTime} onChange={(e: any) => setStartTime(e.target.value)} style={{ width: 100, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'center', outline: 'none', fontFamily: 'inherit' } as any} />
             ) : (
               <Pressable onPress={() => { const [h, m] = startTime.split(':'); const d = new Date(); d.setHours(parseInt(h), parseInt(m)); setTempDate(d); setShowStartTimePicker(true); }} style={{ width: 70 }}>
-                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background, textAlign: 'center' }]}>{formatDisplayTime(startTime)}</Text>
+                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background, textAlign: 'center' }]}>{formatTimeString(startTime, timeFormat)}</Text>
               </Pressable>
             ))}
           </View>
@@ -207,7 +248,7 @@ export default function EditEventScreen() {
               <input type="time" value={endTime} onChange={(e: any) => setEndTime(e.target.value)} style={{ width: 100, fontSize: 14, color: tc.textPrimary, backgroundColor: tc.background, border: 'none', borderRadius: 10, padding: '8px 12px', textAlign: 'center', outline: 'none', fontFamily: 'inherit' } as any} />
             ) : (
               <Pressable onPress={() => { const [h, m] = endTime.split(':'); const d = new Date(); d.setHours(parseInt(h), parseInt(m)); setTempDate(d); setShowEndTimePicker(true); }} style={{ width: 70 }}>
-                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background, textAlign: 'center' }]}>{formatDisplayTime(endTime)}</Text>
+                <Text style={[styles.fieldInput, { color: tc.textPrimary, backgroundColor: tc.background, textAlign: 'center' }]}>{formatTimeString(endTime, timeFormat)}</Text>
               </Pressable>
             ))}
           </View>

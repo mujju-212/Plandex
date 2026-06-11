@@ -16,6 +16,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import EmptyState from '../../src/components/common/EmptyState';
 import FAB from '../../src/components/common/FAB';
 import { useNoteStore } from '../../src/stores/useNoteStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
@@ -150,10 +151,17 @@ export default function NotesScreen() {
       <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {filteredNotes.length === 0 ? (
           <View style={styles.emptyState}>
-            <MaterialIcons name="sticky-note-2" size={64} color={tc.border} />
-            <Text style={[styles.emptyText, { color: tc.textSecondary }]}>
-              {searchQuery ? 'No matching notes' : 'No notes yet. Tap + to create one!'}
-            </Text>
+            <EmptyState
+              icon={searchQuery ? 'search-off' : 'sticky-note-2'}
+              variant="compact"
+              title={searchQuery ? 'No results' : 'No notes yet'}
+              message={searchQuery ? 'Try a different keyword.' : 'Capture quick thoughts here.'}
+              ctaLabel={searchQuery ? 'Clear search' : 'Create note'}
+              onCtaPress={() => {
+                if (searchQuery) setSearchQuery('');
+                else openCreate();
+              }}
+            />
           </View>
         ) : (
           <View style={styles.gridRow}>

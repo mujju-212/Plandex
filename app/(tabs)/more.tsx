@@ -218,19 +218,34 @@ export default function MoreTab() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <View style={styles.avatarCircle}>
-            {profilePhoto
-              ? <Image source={{ uri: profilePhoto }} style={styles.avatarImage} contentFit="cover" />
-              : <Text style={styles.avatarText}>{profileName.charAt(0).toUpperCase()}</Text>
-            }
+          {/* Avatar */}
+          <View style={styles.avatarWrap}>
+            <View style={styles.avatarCircle}>
+              {profilePhoto
+                ? <Image source={{ uri: profilePhoto }} style={styles.avatarImage} contentFit="cover" />
+                : <Text style={styles.avatarText}>{profileName.charAt(0).toUpperCase()}</Text>
+              }
+            </View>
+            <View style={styles.onlineDot} />
           </View>
+
+          {/* Info */}
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profileName}</Text>
-            <Text style={styles.profileLevel}>Level {currentLevel} • {levelTitle}</Text>
+            <View style={styles.profileNameRow}>
+              <Text style={styles.profileName}>{profileName}</Text>
+              <TouchableOpacity onPress={() => router.push('/profile')} style={styles.editBtn}>
+                <MaterialIcons name="edit" size={14} color="rgba(255,255,255,0.85)" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.profileLevel}>Level {currentLevel} · {levelTitle}</Text>
+            {/* XP Progress bar */}
+            <View style={styles.xpBarWrap}>
+              <View style={styles.xpBarTrack}>
+                <View style={[styles.xpBarFill, { width: `${Math.min(100, (totalXP % 500) / 5)}%` as any }]} />
+              </View>
+              <Text style={styles.xpLabel}>{totalXP} XP</Text>
+            </View>
           </View>
-          <TouchableOpacity onPress={() => router.push('/profile')}>
-            <MaterialIcons name="edit" size={20} color="rgba(255,255,255,0.7)" />
-          </TouchableOpacity>
         </LinearGradient>
 
         {/* Stats Row */}
@@ -239,12 +254,12 @@ export default function MoreTab() {
             <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>{totalXP}</Text>
             <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>XP</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: themeColors.border }]} />
           <View style={styles.statBlock}>
             <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>{currentStreak}</Text>
             <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Streak</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: themeColors.border }]} />
           <View style={styles.statBlock}>
             <Text style={[styles.statNumber, { color: themeColors.textPrimary }]}>{todosCompleted}</Text>
             <Text style={[styles.statLabel, { color: themeColors.textSecondary }]}>Done</Text>
@@ -282,7 +297,7 @@ export default function MoreTab() {
               <Switch
                 value={isDark}
                 onValueChange={toggleTheme}
-                trackColor={{ false: colors.border, true: colors.primary }}
+                trackColor={{ false: themeColors.border, true: themeColors.primary }}
                 thumbColor="#FFF"
               />
             }
@@ -295,7 +310,7 @@ export default function MoreTab() {
               <Switch
                 value={notificationsEnabled}
                 onValueChange={handleToggleNotifications}
-                trackColor={{ false: colors.border, true: colors.primary }}
+                trackColor={{ false: themeColors.border, true: themeColors.primary }}
                 thumbColor="#FFF"
               />
             }
@@ -371,37 +386,87 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 14,
   },
+  avatarWrap: {
+    position: 'relative',
+  },
   avatarCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    borderWidth: 2.5,
+    borderColor: 'rgba(255,255,255,0.45)',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#4ADE80',
+    borderWidth: 2,
+    borderColor: '#FFF',
   },
   avatarImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
   },
   avatarText: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '700',
     color: '#FFF',
   },
   profileInfo: {
     flex: 1,
   },
+  profileNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 4,
+    borderRadius: 8,
+  },
   profileName: {
     fontSize: typography.sizes.xl,
     fontWeight: typography.weights.bold as any,
     color: '#FFF',
+    flex: 1,
   },
   profileLevel: {
     fontSize: typography.sizes.sm,
     color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
+  },
+  xpBarWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  xpBarTrack: {
+    flex: 1,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  xpBarFill: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderRadius: 2,
+  },
+  xpLabel: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '600' as any,
   },
   statsRow: {
     flexDirection: 'row',

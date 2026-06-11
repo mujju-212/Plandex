@@ -1,10 +1,13 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useThemeStore } from '../../stores/useThemeStore';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
+
+const LIGHT_LOGO = require('../../../assets/images/light-theme-logo.png');
+const DARK_LOGO = require('../../../assets/images/dark-theme-logo.png');
 
 type GreetingHeaderProps = {
   name?: string;
@@ -34,7 +37,7 @@ export default function GreetingHeader({
   onNotificationPress,
   onMenuPress,
 }: GreetingHeaderProps) {
-  const tc = useThemeStore().colors;
+  const { colors: tc, isDark } = useThemeStore();
   const today = format(new Date(), 'EEEE, MMMM d');
   const greeting = getGreetingText();
 
@@ -42,7 +45,11 @@ export default function GreetingHeader({
     <View style={styles.container}>
       <View style={styles.textContainer}>
         <View style={styles.topRow}>
-          <Text style={[styles.appName, { color: tc.primary }]}>Plandex</Text>
+          <Image
+            source={isDark ? DARK_LOGO : LIGHT_LOGO}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
           <View style={[styles.levelBadge, { backgroundColor: tc.primary + '18' }]}>
             <MaterialIcons name="star" size={14} color={tc.primary} />
             <Text style={[styles.levelText, { color: tc.primary }]}>Lv.{level}</Text>
@@ -93,9 +100,9 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 4,
   },
-  appName: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold as any,
+  logoImage: {
+    height: 44,
+    width: 44,
   },
   levelBadge: {
     flexDirection: 'row',

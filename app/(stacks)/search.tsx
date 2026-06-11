@@ -2,6 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import EmptyState from '../../src/components/common/EmptyState';
 import { useEventStore } from '../../src/stores/useEventStore';
 import { useGoalStore } from '../../src/stores/useGoalStore';
 import { useHabitStore } from '../../src/stores/useHabitStore';
@@ -105,15 +106,23 @@ export default function SearchScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {!query.trim() && (
           <View style={styles.emptyState}>
-            <MaterialIcons name="search" size={64} color={tc.border} />
-            <Text style={[styles.emptyText, { color: tc.textSecondary }]}>Type to search across all your items</Text>
+            <EmptyState
+              icon="search"
+              title="Search everything"
+              message="Type to search across tasks, events, goals, habits, and logs."
+            />
           </View>
         )}
 
         {query.trim() && results.length === 0 && (
           <View style={styles.emptyState}>
-            <MaterialIcons name="search-off" size={48} color={tc.border} />
-            <Text style={[styles.emptyText, { color: tc.textSecondary }]}>No results for "{query}"</Text>
+            <EmptyState
+              icon="search-off"
+              title="No results"
+              message={`Nothing matches “${query}”. Try a different keyword.`}
+              ctaLabel="Clear search"
+              onCtaPress={() => setQuery('')}
+            />
           </View>
         )}
 

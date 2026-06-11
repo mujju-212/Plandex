@@ -13,6 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import EmptyState from '../../../src/components/common/EmptyState';
 import FAB from '../../../src/components/common/FAB';
 import { usePlanningStore } from '../../../src/stores/usePlanningStore';
 import { useThemeStore } from '../../../src/stores/useThemeStore';
@@ -84,13 +85,13 @@ export default function PlanningScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {projects.length === 0 ? (
-          <View style={styles.emptyState}>
-            <MaterialIcons name="folder-open" size={64} color={tc.border} />
-            <Text style={[styles.emptyText, { color: tc.textSecondary }]}>No projects yet</Text>
-            <Text style={[styles.emptySubText, { color: tc.textSecondary }]}>
-              Create a project to organize notes, images, PDFs & more
-            </Text>
-          </View>
+          <EmptyState
+            icon="folder-open"
+            title="No projects yet"
+            message="Create a project to organize notes, images, PDFs, and more."
+            ctaLabel="Create project"
+            onCtaPress={() => setShowModal(true)}
+          />
         ) : (
           projects.map(project => (
             <TouchableOpacity

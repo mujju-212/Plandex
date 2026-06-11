@@ -19,6 +19,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import EmptyState from '../../src/components/common/EmptyState';
 import { useExpenseStore } from '../../src/stores/useExpenseStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { typography } from '../../src/theme/typography';
@@ -627,6 +628,9 @@ export default function ExpensesScreen() {
   }, [filterExpenseType, filterFromDate, filterMaxAmount, filterMinAmount, filterPaymentMethod, filterToDate]);
 
   const formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN', { minimumFractionDigits: 0 })}`;
+  const formatSignedCurrency = (val: number) => `${val < 0 ? '-' : ''}${formatCurrency(Math.abs(val))}`;
+  const openingBalance = summary?.openingBalance ?? 0;
+  const closingBalance = summary?.closingBalance ?? summary?.balance ?? 0;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: tc.background }]}>
@@ -702,6 +706,7 @@ export default function ExpensesScreen() {
             end={{ x: 1, y: 1 }}
           >
             <Text style={styles.summaryLabel}>{monthLabel}</Text>
+            <Text style={styles.summaryNote}>Opening balance: {formatSignedCurrency(openingBalance)}</Text>
             <View style={styles.summaryRow}>
               <View style={styles.summaryBlock}>
                 <Text style={styles.summaryAmount}>{formatCurrency(summary.totalExpense)}</Text>
@@ -714,10 +719,10 @@ export default function ExpensesScreen() {
               </View>
               <View style={[styles.summaryDivider, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
               <View style={styles.summaryBlock}>
-                <Text style={[styles.summaryAmount, { color: summary.balance >= 0 ? '#4ADE80' : '#FF6B6B' }]}> 
-                  {formatCurrency(Math.abs(summary.balance))}
+                <Text style={[styles.summaryAmount, { color: closingBalance >= 0 ? '#4ADE80' : '#FF6B6B' }]}>
+                  {formatSignedCurrency(closingBalance)}
                 </Text>
-                <Text style={styles.summarySubLabel}>{summary.balance >= 0 ? 'Saved' : 'Over'}</Text>
+                <Text style={styles.summarySubLabel}>Balance</Text>
               </View>
             </View>
           </LinearGradient>
@@ -814,8 +819,14 @@ export default function ExpensesScreen() {
         {activeTab === 'list' ? (
           filteredExpenses.length === 0 ? (
             <View style={styles.emptyState}>
-              <MaterialIcons name="receipt-long" size={64} color={tc.border} />
-              <Text style={[styles.emptyText, { color: tc.textSecondary }]}>No transactions in {monthLabel}</Text>
+              <EmptyState
+                icon="receipt-long"
+                variant="compact"
+                title="No transactions yet"
+                message={`No transactions in ${monthLabel}. Add one to start tracking.`}
+                ctaLabel="Add transaction"
+                onCtaPress={() => setShowModal(true)}
+              />
             </View>
           ) : (
             filteredExpenses.map(exp => (
@@ -903,8 +914,14 @@ export default function ExpensesScreen() {
               ))
             ) : (
               <View style={styles.emptyState}>
-                <MaterialIcons name="pie-chart" size={64} color={tc.border} />
-                <Text style={[styles.emptyText, { color: tc.textSecondary }]}>No data to show</Text>
+                <EmptyState
+                  icon="pie-chart"
+                  variant="compact"
+                  title="No data to show"
+                  message="Add a transaction to see your charts and breakdowns."
+                  ctaLabel="Add transaction"
+                  onCtaPress={() => setShowModal(true)}
+                />
               </View>
             )}
           </>
@@ -1337,6 +1354,7 @@ const styles = StyleSheet.create({
   pageContent: { paddingBottom: 12 },
   summaryCard: { marginHorizontal: 20, borderRadius: 20, padding: 20, marginBottom: 16 },
   summaryLabel: { color: 'rgba(255,255,255,0.8)', fontSize: typography.sizes.sm, marginBottom: 12 },
+  summaryNote: { color: 'rgba(255,255,255,0.7)', fontSize: typography.sizes.xs, marginBottom: 12 },
   summaryRow: { flexDirection: 'row', alignItems: 'center' },
   summaryBlock: { flex: 1, alignItems: 'center' },
   summaryAmount: { color: '#FFF', fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any },

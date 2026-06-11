@@ -3,16 +3,17 @@ import { format } from 'date-fns';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import EmptyState from '../../src/components/common/EmptyState';
 import { useMoodStore } from '../../src/stores/useMoodStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { typography } from '../../src/theme/typography';
@@ -210,8 +211,14 @@ export default function MoodScreen() {
             {/* History */}
             {entries.length === 0 ? (
               <View style={styles.emptyState}>
-                <MaterialIcons name="mood" size={64} color={tc.border} />
-                <Text style={[styles.emptyText, { color: tc.textSecondary }]}>No mood entries yet</Text>
+                <EmptyState
+                  icon="mood"
+                  variant="compact"
+                  title="No mood entries yet"
+                  message="Do a quick check-in to start tracking patterns."
+                  ctaLabel="New check-in"
+                  onCtaPress={() => setActiveTab('checkin')}
+                />
               </View>
             ) : (
               entries.map(entry => (

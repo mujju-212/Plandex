@@ -20,7 +20,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
     const router = useRouter();
     const { isDark, toggleTheme, colors: tc } = useThemeStore();
     const { notificationsEnabled, toggleNotifications } = useSettingsStore();
-    const { currentLevel, levelTitle, loadStats } = useGamificationStore();
+    const { currentLevel, levelTitle, totalXP, currentStreak, loadStats } = useGamificationStore();
     const [profileName, setProfileName] = useState('User');
     const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
 
@@ -97,15 +97,39 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
                 <Pressable style={styles.backdrop} onPress={onClose} />
                 <View style={[styles.drawer, { backgroundColor: tc.background }]}>
                     {/* Profile Header */}
-                    <LinearGradient colors={[tc.gradientStart, tc.gradientEnd]} style={styles.profileSection} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                        <View style={styles.avatarCircle}>
-                            {profilePhoto
-                                ? <Image source={{ uri: profilePhoto }} style={styles.avatarImage} contentFit="cover" />
-                                : <Text style={styles.avatarText}>{profileName.charAt(0).toUpperCase()}</Text>
-                            }
+                    <LinearGradient
+                        colors={[tc.gradientStart + 'EE', tc.gradientEnd + 'EE']}
+                        style={styles.profileSection}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    >
+                        <Pressable onPress={() => navigate('/profile')} style={styles.avatarWrap}>
+                            <View style={styles.avatarCircle}>
+                                {profilePhoto
+                                    ? <Image source={{ uri: profilePhoto }} style={styles.avatarImage} contentFit="cover" />
+                                    : <Text style={styles.avatarText}>{profileName.charAt(0).toUpperCase()}</Text>
+                                }
+                            </View>
+                            {/* Edit badge */}
+                            <View style={[styles.editBadge, { backgroundColor: tc.gradientEnd }]}>
+                                <MaterialIcons name="edit" size={10} color="#FFF" />
+                            </View>
+                        </Pressable>
+                        <View style={styles.profileMeta}>
+                            <Text style={styles.profileName}>{profileName}</Text>
+                            <Text style={styles.profileLevel}>Level {currentLevel} · {levelTitle}</Text>
                         </View>
-                        <Text style={styles.profileName}>{profileName}</Text>
-                        <Text style={styles.profileLevel}>Level {currentLevel} · {levelTitle}</Text>
+                        {/* XP + Streak pills */}
+                        <View style={styles.profileStatRow}>
+                            <View style={styles.profileStatPill}>
+                                <MaterialIcons name="bolt" size={13} color="#FFD54F" />
+                                <Text style={styles.profileStatText}>{totalXP} XP</Text>
+                            </View>
+                            <View style={styles.profileStatPill}>
+                                <MaterialIcons name="local-fire-department" size={13} color="#FF7043" />
+                                <Text style={styles.profileStatText}>{currentStreak}d</Text>
+                            </View>
+                        </View>
                     </LinearGradient>
 
                     <ScrollView style={styles.menuScroll} showsVerticalScrollIndicator={false}>
@@ -135,13 +159,17 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
 
                         {/* Preferences */}
                         <Text style={[styles.sectionLabel, { color: tc.textSecondary }]}>PREFERENCES</Text>
-                        <View style={[styles.menuItem]}>
-                            <MaterialIcons name="dark-mode" size={20} color={tc.primary} />
+                        <View style={styles.menuItem}>
+                            <View style={[styles.menuIconWrap, { backgroundColor: tc.primary + '20' }]}>
+                                <MaterialIcons name="dark-mode" size={18} color={tc.primary} />
+                            </View>
                             <Text style={[styles.menuLabel, { color: tc.textPrimary, flex: 1 }]}>Dark Mode</Text>
                             <Switch value={isDark} onValueChange={toggleTheme} trackColor={{ false: tc.border, true: tc.primary }} thumbColor="#FFF" />
                         </View>
-                        <View style={[styles.menuItem]}>
-                            <MaterialIcons name="notifications" size={20} color={tc.primary} />
+                        <View style={styles.menuItem}>
+                            <View style={[styles.menuIconWrap, { backgroundColor: tc.primary + '20' }]}>
+                                <MaterialIcons name="notifications" size={18} color={tc.primary} />
+                            </View>
                             <Text style={[styles.menuLabel, { color: tc.textPrimary, flex: 1 }]}>Notifications</Text>
                             <Switch value={notificationsEnabled} onValueChange={toggleNotifications} trackColor={{ false: tc.border, true: tc.primary }} thumbColor="#FFF" />
                         </View>
@@ -152,7 +180,7 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
                         <SidebarItem icon="cloud-upload" label="Import Data" onPress={handleImport} tc={tc} />
                         <SidebarItem icon="delete-outline" label="Clear All Data" onPress={handleClear} tc={tc} danger />
 
-                        <View style={{ height: 30 }} />
+                        <View style={{ height: 40 }} />
                     </ScrollView>
                 </View>
             </View>
@@ -162,9 +190,15 @@ export default function Sidebar({ visible, onClose }: SidebarProps) {
 
 function SidebarItem({ icon, label, onPress, tc, danger }: { icon: string; label: string; onPress: () => void; tc: any; danger?: boolean }) {
     return (
-        <Pressable style={({ pressed }) => [styles.menuItem, { opacity: pressed ? 0.6 : 1, cursor: 'pointer' as any }]} onPress={onPress}>
-            <MaterialIcons name={icon as any} size={20} color={danger ? tc.danger : tc.primary} />
+        <Pressable
+            style={({ pressed }) => [styles.menuItem, { backgroundColor: pressed ? tc.primary + '10' : 'transparent', cursor: 'pointer' as any }]}
+            onPress={onPress}
+        >
+            <View style={[styles.menuIconWrap, { backgroundColor: danger ? tc.danger + '15' : tc.primary + '15' }]}>
+                <MaterialIcons name={icon as any} size={18} color={danger ? tc.danger : tc.primary} />
+            </View>
             <Text style={[styles.menuLabel, { color: danger ? tc.danger : tc.textPrimary }]}>{label}</Text>
+            <MaterialIcons name="chevron-right" size={16} color={danger ? tc.danger + '80' : tc.textSecondary + '60'} />
         </Pressable>
     );
 }
@@ -172,15 +206,103 @@ function SidebarItem({ icon, label, onPress, tc, danger }: { icon: string; label
 const styles = StyleSheet.create({
     overlay: { flex: 1, flexDirection: 'row' },
     backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-    drawer: { position: 'absolute' as const, left: 0, top: 0, bottom: 0, width: 280, elevation: 6, shadowColor: '#000', shadowOffset: { width: 3, height: 0 }, shadowOpacity: 0.12, shadowRadius: 8 },
-    profileSection: { paddingTop: 50, paddingBottom: 24, paddingHorizontal: 24, gap: 4 },
-    avatarCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: 8 },
-    avatarImage: { width: 48, height: 48, borderRadius: 24 },
-    avatarText: { fontSize: 20, fontWeight: '700' as any, color: '#FFF' },
-    profileName: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any, color: '#FFF' },
-    profileLevel: { fontSize: typography.sizes.xs, color: 'rgba(255,255,255,0.7)' },
-    menuScroll: { flex: 1, paddingHorizontal: 12 },
-    sectionLabel: { fontSize: 11, fontWeight: typography.weights.bold as any, letterSpacing: 1.5, marginTop: 20, marginBottom: 4, paddingHorizontal: 12 },
-    menuItem: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12 },
-    menuLabel: { fontSize: typography.sizes.md, fontWeight: typography.weights.medium as any },
+    drawer: {
+        position: 'absolute' as const,
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 290,
+        elevation: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 4, height: 0 },
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
+    },
+    profileSection: {
+        paddingTop: 52,
+        paddingBottom: 20,
+        paddingHorizontal: 20,
+    },
+    avatarWrap: {
+        position: 'relative',
+        alignSelf: 'flex-start',
+        marginBottom: 12,
+    },
+    avatarCircle: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: 'rgba(255,255,255,0.25)',
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.4)',
+        overflow: 'hidden' as const,
+    },
+    editBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: '#FFF',
+    },
+    avatarImage: { width: 60, height: 60, borderRadius: 30 },
+    avatarText: { fontSize: 24, fontWeight: '700' as any, color: '#FFF' },
+    profileMeta: { gap: 2 },
+    profileName: {
+        fontSize: typography.sizes.lg,
+        fontWeight: typography.weights.bold as any,
+        color: '#FFF',
+    },
+    profileLevel: { fontSize: typography.sizes.xs, color: 'rgba(255,255,255,0.75)' },
+    profileStatRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 12,
+    },
+    profileStatPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    profileStatText: {
+        fontSize: 11,
+        fontWeight: '600' as any,
+        color: '#FFF',
+    },
+    menuScroll: { flex: 1, paddingHorizontal: 10, paddingTop: 4 },
+    sectionLabel: {
+        fontSize: 10,
+        fontWeight: typography.weights.bold as any,
+        letterSpacing: 1.5,
+        marginTop: 18,
+        marginBottom: 2,
+        paddingHorizontal: 12,
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 12,
+        marginVertical: 1,
+    },
+    menuIconWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    menuLabel: { flex: 1, fontSize: typography.sizes.sm, fontWeight: typography.weights.medium as any },
 });

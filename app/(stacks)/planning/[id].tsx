@@ -19,6 +19,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import EmptyState from '../../../src/components/common/EmptyState';
 import { usePlanningStore } from '../../../src/stores/usePlanningStore';
 import { useThemeStore } from '../../../src/stores/useThemeStore';
 import { typography } from '../../../src/theme/typography';
@@ -213,8 +214,20 @@ export default function ProjectDetailScreen() {
         {tab === 'notes' ? (
           notes.length === 0 ? (
             <View style={styles.emptyState}>
-              <MaterialIcons name="note-add" size={48} color={tc.border} />
-              <Text style={[styles.emptyText, { color: tc.textSecondary }]}>No notes yet</Text>
+              <EmptyState
+                icon="note-add"
+                iconSize={48}
+                variant="compact"
+                title="No notes yet"
+                message="Add a note to keep project context in one place."
+                ctaLabel="New note"
+                onCtaPress={() => {
+                  setEditingNote(null);
+                  setNoteTitle('');
+                  setNoteContent('');
+                  setShowNoteModal(true);
+                }}
+              />
             </View>
           ) : (
             notes.map(note => (
@@ -258,8 +271,15 @@ export default function ProjectDetailScreen() {
 
             {files.length === 0 ? (
               <View style={styles.emptyState}>
-                <MaterialIcons name="cloud-upload" size={48} color={tc.border} />
-                <Text style={[styles.emptyText, { color: tc.textSecondary }]}>No files yet</Text>
+                <EmptyState
+                  icon="cloud-upload"
+                  iconSize={48}
+                  variant="compact"
+                  title="No files yet"
+                  message="Upload documents or media for this project."
+                  ctaLabel="Upload file"
+                  onCtaPress={pickDocument}
+                />
               </View>
             ) : (
               files.map(file => (

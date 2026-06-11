@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { CreateTodoInput, CreateTodoListInput, Todo, TodoFilter, TodoList, UpdateTodoInput } from '../../types/todo.types';
+import { isTodoScheduledForDate } from '../../utils/todoDateUtils';
 import { getDB } from '../database';
 
 const TODOS_STORAGE_KEY = 'myplanner_todos';
@@ -212,7 +213,7 @@ class TodoRepository {
                 if (filter.status) todos = todos.filter(t => t.status === filter.status);
                 if (filter.priority) todos = todos.filter(t => t.priority === filter.priority);
                 if (filter.list_id !== undefined) todos = todos.filter(t => t.list_id === filter.list_id);
-                if (filter.date) todos = todos.filter(t => t.start_date === filter.date || t.date_type === 'none');
+                if (filter.date) todos = todos.filter(t => isTodoScheduledForDate(t, filter.date));
                 if (filter.exclude_archived) todos = todos.filter(t => t.status !== 'archived');
             }
             // Sort by position ASC, then created_at DESC (simulated)
@@ -244,10 +245,6 @@ class TodoRepository {
                 query += ' AND list_id = ?';
                 params.push(filter.list_id);
             }
-            if (filter.date) {
-                query += ' AND (start_date = ? OR date_type = "none")';
-                params.push(filter.date);
-            }
             if (filter.exclude_archived) {
                 query += ' AND status != "archived"';
             }
@@ -261,7 +258,13 @@ class TodoRepository {
         }
 
         const rows = await db.getAllAsync(query, params);
-        return rows.map((row: any) => this.mapRowToTodo(row));
+        let todos = rows.map((row: any) => this.mapRowToTodo(row));
+
+        if (filter?.date) {
+            todos = todos.filter(todo => isTodoScheduledForDate(todo, filter.date!));
+        }
+
+        return todos;
     }
 
     async update(id: number, input: UpdateTodoInput): Promise<Todo> {

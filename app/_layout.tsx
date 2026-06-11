@@ -65,14 +65,14 @@ export default function RootLayout() {
     const handleAlarmNotificationResponse = (
       response: import('expo-notifications').NotificationResponse,
       Notifications: typeof import('expo-notifications'),
-    ) => {
+    ): boolean => {
       const data = response.notification.request.content.data as {
         type?: string;
         alarmId?: number | string;
       };
 
       if (data?.type !== 'alarm' || data.alarmId === undefined || data.alarmId === null) {
-        return;
+        return false;
       }
 
       const alarmId = String(data.alarmId);
@@ -91,6 +91,58 @@ export default function RootLayout() {
           alarmTrigger: String(Date.now()),
         },
       } as any);
+      return true;
+    };
+
+    const handleAppNotificationResponse = (
+      response: import('expo-notifications').NotificationResponse,
+      Notifications: typeof import('expo-notifications'),
+    ) => {
+      if (handleAlarmNotificationResponse(response, Notifications)) return;
+
+      const data = response.notification.request.content.data as {
+        type?: string;
+        todoId?: number | string;
+        eventId?: number | string;
+        habitId?: number | string;
+        goalId?: number | string;
+        date?: string;
+      };
+
+      const type = data?.type;
+      if (!type) return;
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      if (type === 'todo' && data.todoId !== undefined && data.todoId !== null) {
+        router.push(`/todo/${String(data.todoId)}` as any);
+        return;
+      }
+
+      if (type === 'event' && data.eventId !== undefined && data.eventId !== null) {
+        router.push(`/event/${String(data.eventId)}` as any);
+        return;
+      }
+
+      if (type === 'habit' && data.habitId !== undefined && data.habitId !== null) {
+        router.push(`/habit/${String(data.habitId)}` as any);
+        return;
+      }
+
+      if (type === 'goal' && data.goalId !== undefined && data.goalId !== null) {
+        router.push(`/goal/${String(data.goalId)}` as any);
+        return;
+      }
+
+      if (type === 'daily_log_reminder') {
+        router.push(`/log/daily/${data.date || today}` as any);
+        return;
+      }
+
+      if (type === 'morning_schedule') {
+        router.push('/(tabs)/calendar' as any);
+        return;
+      }
     };
 
     try {
@@ -98,13 +150,13 @@ export default function RootLayout() {
 
       subscription = Notifications.addNotificationResponseReceivedListener((response) => {
         if (!isMounted) return;
-        handleAlarmNotificationResponse(response, Notifications);
+        handleAppNotificationResponse(response, Notifications);
       });
 
       Notifications.getLastNotificationResponseAsync()
         .then((response) => {
           if (!isMounted || !response) return;
-          handleAlarmNotificationResponse(response, Notifications);
+          handleAppNotificationResponse(response, Notifications);
         })
         .catch(() => {
           // ignore startup response lookup failures

@@ -96,12 +96,12 @@ export default function OnboardingScreen() {
           <LinearGradient colors={['#667eea', '#764ba2']} style={styles.iconCircle}>
             <MaterialIcons name="person" size={48} color="#FFF" />
           </LinearGradient>
-          <Text style={styles.title}>What's your name?</Text>
+          <Text style={styles.title}>What{"'"}s your name?</Text>
           <TextInput style={styles.nameInput} value={name} onChangeText={setName} placeholder="Enter your name" placeholderTextColor={colors.textSecondary} />
 
           <Pressable onPress={handleFinish}>
             <LinearGradient colors={[colors.gradientStart, colors.gradientEnd]} style={styles.nextBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-              <Text style={styles.nextText}>Let's Go!</Text>
+              <Text style={styles.nextText}>Let{"'"}s Go!</Text>
               <MaterialIcons name="rocket-launch" size={20} color="#FFF" />
             </LinearGradient>
           </Pressable>

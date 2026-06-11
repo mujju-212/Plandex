@@ -20,7 +20,7 @@ export default function DailyLogPrompt({ hasLoggedToday, currentStreak, onPress 
         <View style={[styles.doneCard, { backgroundColor: tc.success + '15' }]}>
           <MaterialIcons name="check-circle" size={28} color={tc.success} />
           <View style={styles.doneText}>
-            <Text style={[styles.doneTitle, { color: tc.success }]}>Today's log is done!</Text>
+            <Text style={[styles.doneTitle, { color: tc.success }]}>Today{"'"}s log is done!</Text>
             {currentStreak > 1 && (
               <Text style={[styles.doneSubtitle, { color: tc.textSecondary }]}>
                 {currentStreak} day streak - keep it going!
@@ -55,9 +55,9 @@ export default function DailyLogPrompt({ hasLoggedToday, currentStreak, onPress 
               </View>
             )}
           </View>
-          <Text style={[styles.promptTitle, { color: tc.textPrimary }]}>Write Today's Log</Text>
+          <Text style={[styles.promptTitle, { color: tc.textPrimary }]}>Write Today{"'"}s Log</Text>
           <Text style={[styles.promptDesc, { color: tc.textSecondary }]}>
-            Reflect on your day, track achievements & set tomorrow's goals
+            Reflect on your day, track achievements & set tomorrow{"'"}s goals
           </Text>
         </View>
         <MaterialIcons name="arrow-forward" size={24} color="#FF9800" />

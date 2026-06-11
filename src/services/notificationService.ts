@@ -10,7 +10,8 @@ import type { Alarm } from '../types/clock.types';
 
 // Detect Expo Go — notifications module is unsupported there since SDK 53
 const isExpoGo = Constants.appOwnership === 'expo';
-export const ALARM_CHANNEL_ID = 'alarm-channel';
+// Bump channel ID so Android recreates it with the latest sound settings.
+export const ALARM_CHANNEL_ID = 'alarm-channel-v3';
 export const ALARM_NOTIFICATION_CATEGORY_ID = 'alarm-actions';
 export const ALARM_ACTION_SNOOZE = 'alarm-snooze';
 export const ALARM_ACTION_STOP = 'alarm-stop';
@@ -114,6 +115,8 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   if (!Notifications) return false;
 
   try {
+    await ensureAlarmChannel();
+
     const { status: existing } = await Notifications.getPermissionsAsync();
     if (existing === 'granted') {
       await ensureAlarmNotificationSetup();
@@ -569,7 +572,7 @@ export async function scheduleAlarmReminders(alarm: Alarm): Promise<string[]> {
           body,
           data: { type: 'alarm', alarmId: alarm.id, alarmLabel: body },
           categoryIdentifier: ALARM_NOTIFICATION_CATEGORY_ID,
-          sound: shouldPlaySound,
+          sound: shouldPlaySound ? 'default' : null,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -592,7 +595,7 @@ export async function scheduleAlarmReminders(alarm: Alarm): Promise<string[]> {
           body,
           data: { type: 'alarm', alarmId: alarm.id, alarmLabel: body },
           categoryIdentifier: ALARM_NOTIFICATION_CATEGORY_ID,
-          sound: shouldPlaySound,
+          sound: shouldPlaySound ? 'default' : null,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.WEEKLY,

@@ -3,8 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
-import FAB from '../../src/components/common/FAB';
+import Card from '../../src/components/common/Card';
 import Sidebar from '../../src/components/common/Sidebar';
+import Tag from '../../src/components/common/Tag';
 import ActiveGoals from '../../src/components/dashboard/ActiveGoals';
 import DailyLogPrompt from '../../src/components/dashboard/DailyLogPrompt';
 import GreetingHeader from '../../src/components/dashboard/GreetingHeader';
@@ -22,6 +23,8 @@ import { useLogStore } from '../../src/stores/useLogStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { useTodoStore } from '../../src/stores/useTodoStore';
 import { typography } from '../../src/theme/typography';
+import { isEventOccurringOnDate, isHabitDueOnDate } from '../../src/utils/dateUtils';
+import { isTodoScheduledForDate } from '../../src/utils/todoDateUtils';
 
 export default function HomeTab() {
   const router = useRouter();
@@ -72,25 +75,81 @@ export default function HomeTab() {
   // Computed values
   const todayDate = new Date();
   const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
-  const pendingTodos = useMemo(() => todos.filter(t => t.status !== 'completed'), [todos]);
+  const pendingTodos = useMemo(() => todos.filter(t => t.status !== 'completed' && t.status !== 'archived'), [todos]);
   const pendingCount = pendingTodos.length;
-  const completedCount = todos.length - pendingCount;
-  const todaysTodos = useMemo(() => todos.slice(0, 5), [todos]); // Show up to 5 on dashboard
+  const completedCount = useMemo(() => todos.filter(t => t.status === 'completed').length, [todos]);
+  const orderedTodos = useMemo(() => {
+    if (todos.length <= 1) return todos;
+    const pending = [] as typeof todos;
+    const completed = [] as typeof todos;
+    const archived = [] as typeof todos;
+
+    todos.forEach((todo) => {
+      if (todo.status === 'completed') {
+        completed.push(todo);
+      } else if (todo.status === 'archived') {
+        archived.push(todo);
+      } else {
+        pending.push(todo);
+      }
+    });
+
+    return [...pending, ...completed, ...archived];
+  }, [todos]);
+  const parseLocalDate = (dateValue: string | null | undefined) => {
+    if (!dateValue) return null;
+    const [y, m, d] = dateValue.split('-').map(Number);
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+    const parsed = new Date(y, m - 1, d);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const overdueTodos = useMemo(() => {
+    const todayLocal = parseLocalDate(today) ?? new Date();
+    return todos.filter(t => {
+      if (t.status === 'completed' || t.status === 'archived') return false;
+      if (t.is_recurring) return false;
+      const start = parseLocalDate(t.start_date);
+      if (!start) return false;
+      const end = parseLocalDate(t.end_date) ?? start;
+      return end.getTime() < todayLocal.getTime();
+    });
+  }, [todos, today]);
+  const overdueTodoIds = useMemo(() => new Set(overdueTodos.map(t => t.id)), [overdueTodos]);
+
+  const todayScheduledTodos = useMemo(
+    () => todos.filter(t => isTodoScheduledForDate(t, today)),
+    [todos, today],
+  );
+  const todayTodosLeft = useMemo(
+    () => todayScheduledTodos.filter(t => t.status !== 'completed' && t.status !== 'archived'),
+    [todayScheduledTodos],
+  );
+  const tasksLeftToday = todayTodosLeft.length + overdueTodos.length;
+  const topTodayTodos = useMemo(
+    () => [...overdueTodos, ...todayTodosLeft].slice(0, 5),
+    [overdueTodos, todayTodosLeft],
+  );
 
   const activeHabits = useMemo(() => habits.filter(h => h.is_active), [habits]);
+  const dueHabitsToday = useMemo(
+    () => activeHabits.filter(h => isHabitDueOnDate(h, today)),
+    [activeHabits, today],
+  );
   const todayCompletedHabitIds = useMemo(
     () => new Set(todayCompletions.filter(c => c.date === today).map(c => c.habit_id)),
     [today, todayCompletions]
   );
   const habitsCompletedCount = useMemo(
-    () => activeHabits.filter(h => todayCompletedHabitIds.has(h.id)).length,
-    [activeHabits, todayCompletedHabitIds]
+    () => dueHabitsToday.filter(h => todayCompletedHabitIds.has(h.id)).length,
+    [dueHabitsToday, todayCompletedHabitIds]
   );
+  const habitsLeftToday = Math.max(0, dueHabitsToday.filter(h => !todayCompletedHabitIds.has(h.id)).length);
 
-  const todayEvents = useMemo(() => events.filter(e => {
-    try { return e.start_datetime.startsWith(today) && e.status !== 'cancelled'; }
-    catch { return false; }
-  }), [events, today]);
+  const todayEvents = useMemo(
+    () => events.filter(e => e.status !== 'cancelled' && isEventOccurringOnDate(e, today)),
+    [events, today],
+  );
 
   const activeGoals = useMemo(
     () => goals.filter(g => g.status === 'in_progress' || g.status === 'not_started'),
@@ -152,12 +211,32 @@ export default function HomeTab() {
           onNotificationPress={() => setShowNotifications(true)}
         />
 
+        <View style={styles.todayWrap}>
+          <Card style={styles.todayCard} withShadow={false}>
+            <View style={styles.todayHeaderRow}>
+              <Text style={[styles.todayTitle, { color: tc.textPrimary }]}>Today</Text>
+              <Pressable onPress={() => router.push('/(tabs)/calendar')} hitSlop={8}>
+                <Text style={[styles.todayLink, { color: tc.primary }]}>Calendar</Text>
+              </Pressable>
+            </View>
+            <Text style={[styles.todaySentence, { color: tc.textSecondary }]}>
+              You have {tasksLeftToday} task{tasksLeftToday === 1 ? '' : 's'}, {todayEvents.length} event{todayEvents.length === 1 ? '' : 's'}, {habitsLeftToday} habit{habitsLeftToday === 1 ? '' : 's'} left today.
+            </Text>
+            <View style={styles.todayChipsRow}>
+              <Tag label={`Tasks ${tasksLeftToday}`} variant="chip" onPress={() => router.push('/(tabs)/todos')} />
+              <Tag label={`Events ${todayEvents.length}`} variant="chip" onPress={() => router.push('/event')} />
+              <Tag label={`Habits ${habitsLeftToday}`} variant="chip" onPress={() => router.push('/habit')} />
+              <Tag label={`Overdue ${overdueTodos.length}`} variant="chip" onPress={() => router.push('/(tabs)/todos')} />
+            </View>
+          </Card>
+        </View>
+
         {/* Stats Summary Cards (horizontal scroll) */}
         <TodaySummary
           todosCompleted={completedCount}
           todosTotal={todos.length}
           habitsCompleted={habitsCompletedCount}
-          habitsTotal={activeHabits.length}
+          habitsTotal={dueHabitsToday.length}
           streakDays={currentStreak}
           eventsToday={todayEvents.length}
           activeGoals={activeGoals.length}
@@ -190,10 +269,10 @@ export default function HomeTab() {
         <View style={styles.sectionHeader}>
           <View style={styles.sectionLeft}>
             <MaterialIcons name="check-box" size={20} color={tc.primary} />
-            <Text style={[styles.sectionTitle, { color: tc.textPrimary }]}>Today's Todos</Text>
-            {pendingCount > 0 && (
+            <Text style={[styles.sectionTitle, { color: tc.textPrimary }]}>Today{"'"}s Tasks</Text>
+            {tasksLeftToday > 0 && (
               <View style={[styles.todoBadge, { backgroundColor: tc.danger + '20' }]}>
-                <Text style={[styles.todoBadgeText, { color: tc.danger }]}>{pendingCount}</Text>
+                <Text style={[styles.todoBadgeText, { color: tc.danger }]}>{tasksLeftToday}</Text>
               </View>
             )}
           </View>
@@ -202,24 +281,25 @@ export default function HomeTab() {
           </Pressable>
         </View>
 
-        {todos.length === 0 ? (
+        {tasksLeftToday === 0 ? (
           <View style={[styles.emptyState, { backgroundColor: tc.cardBackground }]}>
             <MaterialIcons name="task-alt" size={40} color={tc.border} />
-            <Text style={[styles.emptyTitle, { color: tc.textSecondary }]}>No tasks yet</Text>
+            <Text style={[styles.emptyTitle, { color: tc.textSecondary }]}>You{"'"}re all caught up for today</Text>
             <Pressable onPress={() => router.push('/todo/create')} style={[styles.emptyBtn, { backgroundColor: tc.primary }]}>
-              <Text style={styles.emptyBtnText}>Create your first todo</Text>
+              <Text style={styles.emptyBtnText}>Add a task</Text>
             </Pressable>
           </View>
         ) : (
-          todaysTodos.map((todo) => (
+          topTodayTodos.map((todo) => (
             <TodoItem
               key={todo.id}
               title={todo.title}
-              tagLabel={todo.tags?.[0] || 'Task'}
+              tagLabel={overdueTodoIds.has(todo.id) ? 'Overdue' : (todo.tags?.[0] || 'Task')}
               tagAppearance={getTagAppearance(todo.tags)}
               time={todo.due_time || 'No Time'}
               priorityColor={getPriorityColor(todo.priority)}
               isCompleted={todo.status === 'completed'}
+              onPress={() => router.push(`/todo/${todo.id}`)}
               onToggle={() => {
                 if (todo.status === 'completed') {
                   uncompleteTodo(todo.id);
@@ -231,9 +311,9 @@ export default function HomeTab() {
           ))
         )}
 
-        {todos.length > 5 && (
+        {tasksLeftToday > 5 && (
           <Pressable onPress={() => router.push('/(tabs)/todos')} style={[styles.showMoreBtn, { backgroundColor: tc.primary + '10' }]}>
-            <Text style={[styles.showMoreText, { color: tc.primary }]}>Show all {todos.length} todos</Text>
+            <Text style={[styles.showMoreText, { color: tc.primary }]}>Show all {tasksLeftToday} tasks</Text>
             <MaterialIcons name="arrow-forward" size={16} color={tc.primary} />
           </Pressable>
         )}
@@ -255,8 +335,6 @@ export default function HomeTab() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
-
-      <FAB onPress={() => setShowCreateMenu(true)} />
 
       {/* Notifications Panel */}
       <Modal visible={showNotifications} transparent animationType="slide" onRequestClose={() => setShowNotifications(false)}>
@@ -365,6 +443,13 @@ export default function HomeTab() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingBottom: 20 },
+  todayWrap: { paddingHorizontal: 20, marginTop: 10 },
+  todayCard: { borderRadius: 16 },
+  todayHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  todayTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any },
+  todayLink: { fontSize: typography.sizes.sm, fontWeight: typography.weights.semiBold as any },
+  todaySentence: { fontSize: typography.sizes.sm, lineHeight: 20 },
+  todayChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 20, marginTop: 20, marginBottom: 8 },
   sectionLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sectionTitle: { fontSize: typography.sizes.lg, fontWeight: typography.weights.bold as any },

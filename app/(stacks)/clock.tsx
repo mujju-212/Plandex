@@ -3,34 +3,36 @@ import Constants from 'expo-constants';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    Alert,
-    Animated,
-    Dimensions,
-    FlatList,
-    Modal,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    useWindowDimensions,
-    Vibration,
-    View
+  Alert,
+  Animated,
+  Dimensions,
+  FlatList,
+  Modal,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  useWindowDimensions,
+  Vibration,
+  View
 } from 'react-native';
+import EmptyState from '../../src/components/common/EmptyState';
 import {
-    ALARM_ACTION_SNOOZE,
-    ALARM_ACTION_STOP,
-    ALARM_CHANNEL_ID,
-    ALARM_NOTIFICATION_CATEGORY_ID,
-    cancelAlarmReminders,
-    requestNotificationPermissions,
-    scheduleAlarmReminders,
+  ALARM_ACTION_SNOOZE,
+  ALARM_ACTION_STOP,
+  ALARM_CHANNEL_ID,
+  ALARM_NOTIFICATION_CATEGORY_ID,
+  cancelAlarmReminders,
+  requestNotificationPermissions,
+  scheduleAlarmReminders,
 } from '../../src/services/notificationService';
 import { useClockStore } from '../../src/stores/useClockStore';
+import { useSettingsStore } from '../../src/stores/useSettingsStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { typography } from '../../src/theme/typography';
 import { Alarm, CreateAlarmInput, DAY_LABELS, TimerMode } from '../../src/types/clock.types';
@@ -409,6 +411,7 @@ export default function ClockScreen() {
     alarmTrigger?: string | string[];
   }>();
   const tc = useThemeStore().colors;
+  const { timeFormat, setTimeFormat } = useSettingsStore();
   const { alarms, loadAlarms, addAlarm, updateAlarm, deleteAlarm, toggleAlarm } = useClockStore();
   const isExpoGo = Constants.appOwnership === 'expo';
 
@@ -417,6 +420,7 @@ export default function ClockScreen() {
   const [showControls, setShowControls] = useState(true);
   const controlsTimeout = useRef<any>(null);
   const [alarmSupportNote, setAlarmSupportNote] = useState<string | null>(null);
+  const [alarmNotificationsReady, setAlarmNotificationsReady] = useState(false);
   const lastAlarmTriggerRef = useRef<Record<number, string>>({});
   const lastHandledNotificationRef = useRef<string>('');
   const activeAlarmSoundRef = useRef<any>(null);
@@ -474,6 +478,7 @@ export default function ClockScreen() {
       if (Platform.OS === 'web') {
         if (active) {
           setAlarmSupportNote('Alarms ring only while this screen is open on web.');
+          setAlarmNotificationsReady(false);
         }
         return;
       }
@@ -481,6 +486,7 @@ export default function ClockScreen() {
       if (isExpoGo) {
         if (active) {
           setAlarmSupportNote('Expo Go does not support background alarm notifications. Keep Clock open for in-app alarms.');
+          setAlarmNotificationsReady(false);
         }
         return;
       }
@@ -488,10 +494,12 @@ export default function ClockScreen() {
       const granted = await requestNotificationPermissions();
       if (!active) return;
 
+      setAlarmNotificationsReady(granted);
+
       if (!granted) {
         setAlarmSupportNote('Allow notifications to run alarms in background.');
       } else {
-        setAlarmSupportNote(null);
+        setAlarmSupportNote('Background alarms use the system notification sound. Imported custom tones play after you open the alarm.');
       }
     };
 
@@ -510,7 +518,7 @@ export default function ClockScreen() {
         cancelAlarmReminders(alarm.id).catch(() => { });
       }
     });
-  }, [alarms]);
+  }, [alarms, alarmNotificationsReady]);
 
   const clearSnoozeTimeoutForAlarm = useCallback((alarmId: number) => {
     const timeoutId = snoozeTimeoutsRef.current[alarmId];
@@ -621,7 +629,7 @@ export default function ClockScreen() {
               body: alarmMessage,
               data: { type: 'alarm', alarmId: alarm.id, alarmLabel: alarmMessage },
               categoryIdentifier: ALARM_NOTIFICATION_CATEGORY_ID,
-              sound: true,
+              sound: 'default',
             },
             trigger: null,
           });
@@ -641,10 +649,12 @@ export default function ClockScreen() {
 
     const snoozeMs = ALARM_SNOOZE_MINUTES * 60 * 1000;
 
+    // Always schedule the in-app timeout so it rings fully if the app stays open
+    snoozeTimeoutsRef.current[alarm.id] = setTimeout(() => {
+      ringAlarm(alarm, 'snooze').catch(() => { });
+    }, snoozeMs);
+
     if (Platform.OS === 'web' || isExpoGo) {
-      snoozeTimeoutsRef.current[alarm.id] = setTimeout(() => {
-        ringAlarm(alarm, 'snooze').catch(() => { });
-      }, snoozeMs);
       return;
     }
 
@@ -658,7 +668,7 @@ export default function ClockScreen() {
           body: alarm.label?.trim() || 'Alarm time',
           data: { type: 'alarm', alarmId: alarm.id, snoozed: true },
           categoryIdentifier: ALARM_NOTIFICATION_CATEGORY_ID,
-          sound: true,
+          sound: 'default',
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -719,13 +729,19 @@ export default function ClockScreen() {
     }
 
     if (alarmAction === ALARM_ACTION_SNOOZE) {
-      scheduleSnoozeAlarm(alarm).catch(() => { });
+      if (activeRingingAlarm?.id === alarm.id) {
+        handleSnoozeAlarm().catch(() => { });
+      } else {
+        scheduleSnoozeAlarm(alarm).catch(() => { });
+      }
       return;
     }
 
     ringAlarm(alarm, 'notification').catch(() => { });
   }, [
     alarms,
+    activeRingingAlarm,
+    handleSnoozeAlarm,
     handleStopAlarm,
     params.alarmAction,
     params.alarmId,
@@ -961,10 +977,14 @@ export default function ClockScreen() {
 
   const getDigits = useCallback((): string[] => {
     if (mode === 'clock') {
-      const h = pad(now.getHours());
+      let h = now.getHours();
+      if (timeFormat === '12h') {
+        h = ((h + 11) % 12) + 1; // convert to 1-12
+      }
       const m = pad(now.getMinutes());
       const s = pad(now.getSeconds());
-      return [h[0], h[1], m[0], m[1], s[0], s[1]];
+      const hStr = pad(h);
+      return [hStr[0], hStr[1], m[0], m[1], s[0], s[1]];
     }
     if (mode === 'timer') {
       const h = Math.floor(timerRemaining / 3600);
@@ -980,7 +1000,7 @@ export default function ClockScreen() {
       return [pad(m)[0], pad(m)[1], pad(s)[0], pad(s)[1], pad(cs)[0], pad(cs)[1]];
     }
     return ['0', '0', '0', '0', '0', '0'];
-  }, [mode, now, timerRemaining, swElapsed]);
+  }, [mode, now, timerRemaining, swElapsed, timeFormat]);
 
   const digitColor = tc.primary;
   const digits = getDigits();
@@ -1067,9 +1087,31 @@ export default function ClockScreen() {
               <FlipDigit value={digits[5]} prevValue={prevDigitsRef.current[5]} color={digitColor} size="normal" />
             </View>
             {mode === 'clock' && (
-              <Text style={[styles.dateText, { color: tc.textSecondary }]}>
-                {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-              </Text>
+              <>
+                {timeFormat === '12h' && (
+                  <Text style={[styles.meridiemText, { color: tc.primary }]}>
+                    {now.getHours() >= 12 ? 'PM' : 'AM'}
+                  </Text>
+                )}
+                <Text style={[styles.dateText, { color: tc.textSecondary }]}>
+                  {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                </Text>
+                {/* 12h / 24h toggle */}
+                <View style={styles.formatToggleRow}>
+                  <TouchableOpacity
+                    style={[styles.formatBtn, timeFormat === '12h' && { backgroundColor: tc.primary }]}
+                    onPress={() => setTimeFormat('12h')}
+                  >
+                    <Text style={[styles.formatBtnText, { color: timeFormat === '12h' ? '#FFF' : tc.textSecondary }]}>12h</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.formatBtn, timeFormat === '24h' && { backgroundColor: tc.primary }]}
+                    onPress={() => setTimeFormat('24h')}
+                  >
+                    <Text style={[styles.formatBtnText, { color: timeFormat === '24h' ? '#FFF' : tc.textSecondary }]}>24h</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
             )}
           </View>
         )}
@@ -1182,8 +1224,14 @@ export default function ClockScreen() {
 
             {alarms.length === 0 ? (
               <View style={styles.emptyState}>
-                <MaterialIcons name="alarm" size={56} color={tc.border} />
-                <Text style={[styles.emptyText, { color: tc.textSecondary }]}>No alarms</Text>
+                <EmptyState
+                  icon="alarm"
+                  variant="compact"
+                  title="No alarms yet"
+                  message="Create an alarm so you never miss a moment."
+                  ctaLabel="New alarm"
+                  onCtaPress={openCreateAlarm}
+                />
               </View>
             ) : (
               alarms.map(alarm => (
@@ -1622,4 +1670,26 @@ const styles = StyleSheet.create({
   dayBtnText: { fontSize: typography.sizes.xs, fontWeight: typography.weights.semiBold as any },
   saveBtn: { paddingVertical: 14, borderRadius: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#FFF', fontSize: typography.sizes.md, fontWeight: typography.weights.bold as any },
+  meridiemText: {
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.bold as any,
+    marginTop: 4,
+    letterSpacing: 2,
+  },
+  formatToggleRow: {
+    flexDirection: 'row',
+    marginTop: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    gap: 4,
+  },
+  formatBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  formatBtnText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold as any,
+  },
 });

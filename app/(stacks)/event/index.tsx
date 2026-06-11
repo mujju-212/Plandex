@@ -3,9 +3,11 @@ import { format, isThisWeek, isToday, isTomorrow } from 'date-fns';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Tag from '../../../src/components/common/Tag';
 import { useEventStore } from '../../../src/stores/useEventStore';
 import { useThemeStore } from '../../../src/stores/useThemeStore';
 import { typography } from '../../../src/theme/typography';
+import { getEventOccurrenceStartDateTime, isEventOccurringOnDate } from '../../../src/utils/dateUtils';
 
 type Filter = 'today' | 'upcoming' | 'all' | 'completed';
 
@@ -17,7 +19,8 @@ export default function EventListScreen() {
 
   useFocusEffect(useCallback(() => { loadEvents(); }, []));
 
-  const todayEvents = events.filter(e => isToday(new Date(e.start_datetime)));
+  const todayDateStr = new Date().toISOString().slice(0, 10);
+  const todayEvents = events.filter(e => e.status !== 'cancelled' && isEventOccurringOnDate(e, todayDateStr));
   const upcomingEvents = events.filter(e => e.status === 'upcoming');
   const completedEvents = events.filter(e => e.status === 'completed');
 
@@ -35,7 +38,8 @@ export default function EventListScreen() {
 
   const formatTime = (e: any) => {
     if (e.is_all_day) return 'All Day';
-    const d = new Date(e.start_datetime);
+    const startDt = filter === 'today' && e.is_recurring ? getEventOccurrenceStartDateTime(e, todayDateStr) : e.start_datetime;
+    const d = new Date(startDt);
     const when = isToday(d) ? 'Today'
       : isTomorrow(d) ? 'Tomorrow'
       : isThisWeek(d) ? format(d, 'EEE')
@@ -85,16 +89,14 @@ export default function EventListScreen() {
         {/* Filter Pills */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
           {FILTERS.map(f => (
-            <Pressable
+            <Tag
               key={f.key}
-              style={[styles.pill, { backgroundColor: tc.cardBackground, borderColor: tc.border },
-                filter === f.key && { backgroundColor: tc.primary, borderColor: tc.primary }]}
+              label={`${f.label}${f.count > 0 ? `  ${f.count}` : ''}`}
+              variant="chip"
+              selected={filter === f.key}
               onPress={() => setFilter(f.key)}
-            >
-              <Text style={[styles.pillText, { color: tc.textSecondary }, filter === f.key && { color: '#FFF' }]}>
-                {f.label}{f.count > 0 ? `  ${f.count}` : ''}
-              </Text>
-            </Pressable>
+              style={{ marginRight: 8 }}
+            />
           ))}
         </ScrollView>
 
@@ -165,8 +167,6 @@ const styles = StyleSheet.create({
   statValue: { fontSize: typography.sizes.xxl, fontWeight: typography.weights.bold as any },
   statLabel: { fontSize: typography.sizes.xs },
   filterRow: { marginBottom: 12 },
-  pill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, marginRight: 8 },
-  pillText: { fontSize: typography.sizes.sm, fontWeight: typography.weights.medium as any },
   card: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, marginBottom: 8, overflow: 'hidden' },
   strip: { width: 4, alignSelf: 'stretch' },
   cardBody: { flex: 1, paddingVertical: 11, paddingLeft: 12, paddingRight: 4, gap: 3 },

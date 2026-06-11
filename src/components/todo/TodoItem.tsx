@@ -49,7 +49,7 @@ export default function TodoItem({
           <View style={styles.metaRow}>
             <Tag label={tagLabel} appearance={tagAppearance} />
             <View style={styles.rightContainer}>
-              <Text style={[styles.time, { color: tc.textSecondary }]}>{time}</Text>
+              <Tag label={time} variant="chip" />
               <View style={[styles.dot, { backgroundColor: priorityColor }]} />
             </View>
           </View>
@@ -91,10 +91,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  time: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium as any,
   },
   dot: {
     width: 10,

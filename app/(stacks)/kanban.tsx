@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import EmptyState from '../../src/components/common/EmptyState';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { useTodoStore } from '../../src/stores/useTodoStore';
 import { typography } from '../../src/theme/typography';
@@ -116,8 +117,13 @@ export default function KanbanScreen() {
             <ScrollView showsVerticalScrollIndicator={false} style={styles.columnScroll}>
               {columns[col.key].length === 0 ? (
                 <View style={styles.emptyColumn}>
-                  <MaterialIcons name="inbox" size={32} color={tc.border} />
-                  <Text style={[styles.emptyText, { color: tc.textSecondary }]}>No items</Text>
+                  <EmptyState
+                    icon="inbox"
+                    iconSize={32}
+                    variant="compact"
+                    title="Nothing here yet"
+                    message="Add a task, then move it across columns."
+                  />
                 </View>
               ) : (
                 columns[col.key].map(todo => (

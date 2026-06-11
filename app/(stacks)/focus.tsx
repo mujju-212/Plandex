@@ -13,6 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import EmptyState from '../../src/components/common/EmptyState';
 import { useClockStore } from '../../src/stores/useClockStore';
 import { useThemeStore } from '../../src/stores/useThemeStore';
 import { useTodoStore } from '../../src/stores/useTodoStore';
@@ -321,8 +322,14 @@ export default function FocusScreen() {
           <>
             {recentSessions.length === 0 ? (
               <View style={styles.emptyState}>
-                <MaterialIcons name="history" size={48} color={tc.border} />
-                <Text style={[styles.emptyText, { color: tc.textSecondary }]}>No sessions yet</Text>
+                <EmptyState
+                  icon="history"
+                  variant="compact"
+                  title="No sessions yet"
+                  message="Start a focus session to build your history."
+                  ctaLabel="Start session"
+                  onCtaPress={() => setTab('timer')}
+                />
               </View>
             ) : (
               recentSessions.map(session => (
