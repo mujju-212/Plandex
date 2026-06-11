@@ -5,7 +5,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Card from '../../src/components/common/Card';
 import EmptyState from '../../src/components/common/EmptyState';
-import FAB from '../../src/components/common/FAB';
 import Sidebar from '../../src/components/common/Sidebar';
 import Tag from '../../src/components/common/Tag';
 import { habitService } from '../../src/services/habitService';
@@ -545,8 +544,6 @@ export default function CalendarTab() {
           </ScrollView>
         </>
       )}
-
-      <FAB onPress={() => setShowCreateMenu(true)} />
 
       {/* Create Chooser Modal */}
       <Modal visible={showCreateMenu} transparent animationType="fade" onRequestClose={() => setShowCreateMenu(false)}>

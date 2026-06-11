@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.5.0-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/platform-Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/Expo%20SDK-54-blueviolet?style=flat-square" alt="Expo SDK" />
   <img src="https://img.shields.io/badge/React%20Native-0.81.5-61dafb?style=flat-square" alt="React Native" />

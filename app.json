@@ -2,7 +2,7 @@
   "expo": {
     "name": "Plandex",
     "slug": "myplanner",
-    "version": "1.0.0",
+    "version": "1.5.0",
     "orientation": "default",
     "icon": "./assets/images/light-theme-logo.png",
     "scheme": "plandex",
