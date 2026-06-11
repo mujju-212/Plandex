@@ -5,7 +5,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Platform, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Card from '../../src/components/common/Card';
 import EmptyState from '../../src/components/common/EmptyState';
-import FAB from '../../src/components/common/FAB';
 import Sidebar from '../../src/components/common/Sidebar';
 import Tag from '../../src/components/common/Tag';
 import TodoItem from '../../src/components/todo/TodoItem';
@@ -340,7 +339,6 @@ export default function TodosTab() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <FAB onPress={() => router.push('/todo/create')} />
       <Sidebar visible={showSidebar} onClose={() => setShowSidebar(false)} />
 
       <Modal visible={showReschedule} transparent animationType="fade" onRequestClose={() => setShowReschedule(false)}>

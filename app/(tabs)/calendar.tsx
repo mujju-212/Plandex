@@ -702,7 +702,6 @@ const styles = StyleSheet.create({
   itemCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.cardBackground,
     borderRadius: 14,
     padding: 14,
     marginBottom: 8,
@@ -733,7 +732,6 @@ const styles = StyleSheet.create({
   logCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryLight + '20',
     borderRadius: 12,
     padding: 14,
     marginBottom: 8,
