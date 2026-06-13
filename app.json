@@ -31,8 +31,8 @@
         "SCHEDULE_EXACT_ALARM"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff",
-        "foregroundImage": "./assets/images/light-theme-logo.png"
+        "backgroundColor": "#F4F9FF",
+        "foregroundImage": "./assets/images/adaptive-icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -49,10 +49,10 @@
           "image": "./assets/images/light-theme-logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#F4F9FF",
           "dark": {
             "image": "./assets/images/dark-theme-logo.png",
-            "backgroundColor": "#000000"
+            "backgroundColor": "#0A0A0A"
           }
         }
       ],
