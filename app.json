@@ -31,7 +31,7 @@
         "SCHEDULE_EXACT_ALARM"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#F4F9FF",
+        "backgroundColor": "transparent",
         "foregroundImage": "./assets/images/adaptive-icon.png"
       },
       "edgeToEdgeEnabled": true,
